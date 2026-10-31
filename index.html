@@ -278,7 +278,7 @@ async function init(m) {
   ort.env.wasm.wasmPaths = m.ort;
   ort.env.wasm.wasmBinary = await grab(m.ort + 'ort-wasm-simd-threaded.wasm', m.cache);
   const opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-  dict = new TextDecoder().decode(await grab(m.dict, m.cache)).split('\n');
+  dict = new TextDecoder().decode(await grab(m.dict, m.cache)).split(/\r?\n/);
   if (dict[dict.length - 1] === '') dict.pop();
   det = await ort.InferenceSession.create(new Uint8Array(await grab(m.det, m.cache)), opt);
   rec = await ort.InferenceSession.create(new Uint8Array(await grab(m.rec, m.cache)), opt);
