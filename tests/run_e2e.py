@@ -21,7 +21,14 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLES = ROOT / "samples"
 OUT = ROOT / "tests" / "out"
-ANSWERS = {a["file"]: a for a in json.loads((SAMPLES / "answers.json").read_text(encoding="utf-8"))}
+ANSWERS = {a["file"]: a for f in ("answers.json", "scan_answers.json") if (SAMPLES / f).exists()
+           for a in json.loads((SAMPLES / f).read_text(encoding="utf-8"))}
+FLAG_FILLS = {"FFFFF2CC": "黄", "FFF8CBAD": "橙", "FFFFC7CE": "红"}
+
+
+def flag_of(cell):
+    rgb = cell.fill.fgColor.rgb if cell.fill and cell.fill.fill_type == "solid" else None
+    return FLAG_FILLS.get(rgb) if isinstance(rgb, str) else None
 
 
 # ---------------------------------------------------------------- 假谷歌：按钥匙的开头决定怎么回
@@ -149,6 +156,8 @@ def score(xlsx, ans):
     tot = {"num": [0, 0], "date": [0, 0], "text": [0, 0], "empty": [0, 0], "header": [0, 0]}
     zeros = [0, 0]
     sums_ok = True
+    miss = {"num_flagged": 0, "num_silent": 0, "text_flagged": 0, "text_silent": 0}
+    silent = []
     for i, t in enumerate(ans["tables"]):
         tr = {"rows_expected": len(t["rows"]), "wrong": []}
         if i >= len(sheets):
@@ -194,8 +203,14 @@ def score(xlsx, ans):
                     colsum_e[c] = colsum_e.get(c, 0) + e["n"]
                     if isinstance(got, (int, float)):
                         colsum_g[c] = colsum_g.get(c, 0) + got
-                if not ok and len(tr["wrong"]) < 12:
-                    tr["wrong"].append(f"{ws.cell(H + r + 1, c + 1).coordinate}: 应为 {e} 实为 {got!r}")
+                if not ok:
+                    fl = flag_of(ws.cell(H + r + 1, c + 1))
+                    kind = "num" if k in ("num", "date") else "text"
+                    miss[f"{kind}_{'flagged' if fl else 'silent'}"] += 1
+                    if kind == "num" and not fl:
+                        silent.append(f"{ws.cell(H + r + 1, c + 1).coordinate}: 应为 {e} 实为 {got!r}")
+                    if len(tr["wrong"]) < 40:
+                        tr["wrong"].append(f"{ws.cell(H + r + 1, c + 1).coordinate}: 应为 {e} 实为 {got!r}" + (f" [{fl}]" if fl else " [没标]"))
         for c in colsum_e:
             if abs(colsum_e[c] - colsum_g.get(c, 0)) > 1e-6 * max(1, abs(colsum_e[c])):
                 sums_ok = False
@@ -209,6 +224,9 @@ def score(xlsx, ans):
     rep["header_wrong"] = tot["header"][1] - tot["header"][0]
     rep["leading_zero"] = f"{zeros[0]}/{zeros[1]}"
     rep["column_sums_ok"] = sums_ok
+    rep["wrong_flagged"] = miss
+    rep["silent_num"] = silent[:20]
+    rep["flags_total"] = sum(1 for ws in sheets for row in ws.iter_rows() for c in row if flag_of(c))
     return rep
 
 
@@ -371,51 +389,94 @@ def main():
 
         if todo("s6") or todo("gemini"):
             s6 = SAMPLES / "s6_扫描版.pdf"
-            # 没钥匙：不能悄悄吐空表，要停下来要钥匙
+            # 没钥匙：本地认字，照样出 Excel，人不用多点一下；页面说一句「本地认的」，钥匙框留着
             page = open_page(ctx, port, keys=[])
-            res, _ = run_file(page, s6, expect_download=False)
-            report["s6 没钥匙"] = res
+            res, path = run_file(page, s6, timeout=600_000)
+            res["score"] = score(path, ANSWERS["s6_扫描版.pdf"])
+            report["s6 没钥匙（本地认）"] = res
             print("s6 没钥匙", json.dumps(res, ensure_ascii=False))
-            # 贴钥匙接着干（假谷歌照标准答案回）
+            if shots:
+                page.screenshot(path=str(ROOT / "docs" / "截图_扫描件_电脑.png"), full_page=True)
+            # 再贴钥匙：借（假）谷歌重认一遍，Excel 再下一次
             with page.expect_download(timeout=120_000) as d:
                 page.fill("#d-keyin", "ok_" + "A" * 36)
-            page.wait_for_function("window.__pabiao.phase === 'done' && window.__pabiao.result && !window.__pabiao.result.scanLeft.length")
-            path = OUT / "s6_扫描版.xlsx"
+            page.wait_for_function("window.__pabiao.phase === 'done' && window.__pabiao.result && window.__pabiao.result.via.every(v => v[1] === 'gemini')")
+            path = OUT / "s6_扫描版_贴钥匙.xlsx"
             d.value.save_as(str(path))
             res = page.evaluate("window.__pabiao.result")
             res["score"] = score(path, ANSWERS["s6_扫描版.pdf"])
-            report["s6 贴钥匙后"] = res
-            print("s6 贴钥匙后", json.dumps(res, ensure_ascii=False, indent=1))
+            report["s6 贴钥匙后（谷歌认）"] = res
+            print("s6 贴钥匙后", json.dumps(res, ensure_ascii=False))
             page.close()
 
+            # (名字, 钥匙/模型, 期望走谁, 日志或报错里要有的字)
             cases = [
-                ("额度到顶（每分钟）", dict(keys=["minute_" + "A" * 30]), True, "每分钟次数到顶"),
-                ("额度到顶（当天，换 2 号钥匙）", dict(keys=["day_" + "A" * 30, "ok2_" + "A" * 30]), True, "今天的额度用完了"),
-                ("钥匙无效", dict(keys=["bad_" + "A" * 30]), False, "HTTP 400：API key not valid. Please pass a valid API key."),
-                ("模型不存在", dict(keys=["ok3_" + "A" * 30], model="gemini-nope"), False, "HTTP 404：models/gemini-nope is not found"),
-                ("回来的不是 JSON", dict(keys=["html_" + "A" * 30]), False, "返回的不是 JSON：<html>"),
-                ("断网", dict(keys=["ok4_" + "A" * 30], extra="&api=http://127.0.0.1:9/v1beta"), False, "网络错误："),
-                ("第二遍认错一格（二比一）", dict(keys=["flaky_" + "A" * 30]), True, ""),
-                ("三遍各不一样（标红）", dict(keys=["split_" + "A" * 30]), True, ""),
+                ("额度到顶（每分钟）", dict(keys=["minute_" + "A" * 30]), "gemini", "每分钟次数到顶"),
+                ("额度到顶（当天，换 2 号钥匙）", dict(keys=["day_" + "A" * 30, "ok2_" + "A" * 30]), "gemini", "今天的额度用完了"),
+                ("钥匙无效 → 本地认", dict(keys=["bad_" + "A" * 30]), "local", "HTTP 400：API key not valid. Please pass a valid API key."),
+                ("模型不存在 → 本地认", dict(keys=["ok3_" + "A" * 30], model="gemini-nope"), "local", "HTTP 404：models/gemini-nope is not found"),
+                ("回来的不是 JSON → 本地认", dict(keys=["html_" + "A" * 30]), "local", "返回的不是 JSON：<html>"),
+                ("断网 → 本地认", dict(keys=["ok4_" + "A" * 30], extra="&api=http://127.0.0.1:9/v1beta"), "local", "网络错误："),
+                ("两把钥匙当天都用完 → 本地认", dict(keys=["day_" + "B" * 30, "day_" + "C" * 30]), "local", "所有钥匙今天的额度都用完了"),
+                ("第二遍认错一格（二比一）", dict(keys=["flaky_" + "A" * 30]), "gemini", ""),
+                ("三遍各不一样（标红）", dict(keys=["split_" + "A" * 30]), "gemini", ""),
             ]
-            for name, kw, ok_dl, needle in cases:
+            for name, kw, via, needle in cases:
                 page = open_page(ctx, port, keys=kw["keys"], model=kw.get("model"), extra=kw.get("extra", ""))
-                res, path = run_file(page, s6, expect_download=ok_dl, timeout=180_000)
+                res, path = run_file(page, s6, timeout=600_000)
                 log = page.evaluate("window.__pabiao.log")
                 res["needle_found"] = (not needle) or any(needle in x for x in log) or needle in res["err_text"]
+                res["via_ok"] = all(v[1] == via for v in res["via"])
                 if path:
                     res["score"] = score(path, ANSWERS["s6_扫描版.pdf"])
                 report["假谷歌 · " + name] = res
                 print(name, json.dumps(res, ensure_ascii=False))
                 page.close()
-            # 两把钥匙当天都用完：页面说要等到几点，不卡死
-            page = open_page(ctx, port, keys=["day_" + "B" * 30, "day_" + "C" * 30])
-            page.set_input_files("#pick", str(s6))
-            page.wait_for_function("window.__pabiao.log.some(x => x.includes('所有钥匙今天的额度都用完了'))", timeout=60_000)
-            msg = [x for x in page.evaluate("window.__pabiao.log") if "所有钥匙" in x][0]
-            report["假谷歌 · 两把钥匙当天都用完"] = {"status": msg, "needle_found": True}
-            print("两把都用完", msg)
-            page.close()
+
+        if todo("ocr") or todo("o"):
+            # 扫描件本地认字：每份样本电脑宽、手机宽各跑一遍；第一次要下多少、第二次还下不下
+            fresh = browser.new_context(accept_downloads=True, viewport={"width": 1280, "height": 900})
+            got = {"bytes": 0, "files": {}}
+
+            def on_resp(r):
+                u = r.url
+                if any(k in u for k in ("onnxruntime-web", "models/ppocrv5")):
+                    try:
+                        n = r.request.sizes()["responseBodySize"]
+                    except Exception:
+                        n = 0
+                    got["bytes"] += n
+                    got["files"][u.split("/")[-1]] = n
+            fresh.on("response", on_resp)
+            files = sorted(f for f, a in ANSWERS.items() if a.get("scanned") and f.startswith("o")) + ["s6_扫描版.pdf"]
+            files = [f for f in files if not want or any(w in f for w in want) or "ocr" in want]
+            first = None
+            for k, f in enumerate(files):
+                page = open_page(fresh, port, keys=[])
+                res, path = run_file(page, SAMPLES / f, timeout=600_000)
+                if k == 0:
+                    first = {"bytes": got["bytes"], "files": dict(got["files"])}
+                    got["bytes"] = 0
+                    got["files"] = {}
+                res["score"] = score(path, ANSWERS[f])
+                res["ocr"] = page.evaluate("window.__pabiao.ocr")
+                page.close()
+                report["本地认 · " + f] = res
+                print(f, json.dumps({k2: res[k2] for k2 in ("seconds", "title", "max_main_thread_gap_ms", "downloads")}, ensure_ascii=False),
+                      json.dumps(res["score"]["cells"], ensure_ascii=False), json.dumps(res["score"]["wrong_flagged"], ensure_ascii=False))
+            report["本地认 · 下载量"] = {"第一次": first, "之后（同一个浏览器）": dict(got)}
+            print("下载量", json.dumps(report["本地认 · 下载量"], ensure_ascii=False))
+            fresh.close()
+            mob = browser.new_context(accept_downloads=True, viewport={"width": 390, "height": 844}, device_scale_factor=2,
+                                      is_mobile=True, has_touch=True)
+            for f in files:
+                page = open_page(mob, port, keys=[])
+                res, path = run_file(page, SAMPLES / f, timeout=600_000)
+                res["score"] = score(path, ANSWERS[f])
+                page.close()
+                report["本地认 · 手机宽 · " + f] = res
+                print("手机宽", f, res["seconds"], json.dumps(res["score"]["cells"], ensure_ascii=False))
+            mob.close()
 
         if shots and todo("s4"):
             m = browser.new_context(accept_downloads=True, viewport={"width": 390, "height": 844}, device_scale_factor=2,

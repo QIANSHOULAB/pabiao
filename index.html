@@ -13,7 +13,7 @@
   :root {
     --bg: #F5F5F7; --card: #FFFFFF; --text: #1D1D1F; --grey: #6E6E73; --grey2: #86868B; --line: #E5E5EA;
     --blue: #0071E3; --blue-hover: #0077ED; --link: #0066CC; --green: #1D9A55; --fill: #F5F5F7;
-    --yellow: #FFF2CC; --red: #FFD9DD; --red-text: #B3261E;
+    --yellow: #FFF2CC; --orange: #F8CBAD; --red: #FFD9DD; --red-text: #B3261E;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -114,6 +114,7 @@
   table.pv th { background: var(--fill); font-weight: 600; text-align: center; border: 1px solid #fff; }
   table.pv td.n { text-align: right; font-variant-numeric: tabular-nums; }
   table.pv td.y { background: var(--yellow); }
+  table.pv td.o { background: var(--orange); }
   table.pv td.r { background: var(--red); }
   .more { color: var(--grey2); font-size: 13px; margin: 10px 4px 0; }
 
@@ -179,7 +180,7 @@
         <div class="h">几十上百页也行，表跨页了贫僧给你接上</div>
         <span class="btn">选 PDF</span>
       </div>
-      <p class="note">文件就在你浏览器里拆，不上传。扫描件除外：那得借谷歌的眼睛看。</p>
+      <p class="note">文件就在你浏览器里拆，不上传。贴了钥匙，扫描件才借谷歌的眼睛看。</p>
     </div>
 
     <!-- 干活中 -->
@@ -199,7 +200,7 @@
         <p id="d-line2" class="warn" hidden></p>
       </div>
       <div class="keybox" id="d-key" hidden>
-        <h3>贴一把钥匙，接着就干</h3>
+        <h3 id="d-keyh"></h3>
         <p id="d-keywhy"></p>
         <div class="keyrow">
           <input class="field" id="d-keyin" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴钥匙（AIza… 或 AQ.…）">
@@ -216,7 +217,7 @@
 
   <section class="preview" id="preview" hidden>
     <h2>扒出来的样子</h2>
-    <p id="pv-note">每张表只放前几行。<span style="background:var(--yellow);padding:0 4px;border-radius:4px">黄格</span>是贫僧拿不准的，<span style="background:var(--red);padding:0 4px;border-radius:4px">红格</span>是谷歌几遍认得不一样的，Excel 里同样标着。</p>
+    <p id="pv-note">每张表只放前几行。<span style="background:var(--yellow);padding:0 4px;border-radius:4px">黄格</span>拿不准，<span style="background:var(--orange);padding:0 4px;border-radius:4px">橙格</span>是字母改回了数字，<span style="background:var(--red);padding:0 4px;border-radius:4px">红格</span>几遍认得不一样。Excel 里同样标着，鼠标放上去看原因。</p>
     <div id="pv"></div>
   </section>
 </main>
@@ -239,9 +240,523 @@
   </div>
 </div></dialog>
 
+<script type="text/plain" id="ocr-src">
+// 扒表僧 · 本地认字。在 Worker 里跑，不卡页面。模型是 PP-OCRv5 mobile（Apache-2.0）：det 找字在哪，rec 一段段认。
+// 先把图收拾干净：压平阴影 → 扶正 → 找出表格线（交给拼表）并擦掉（免得被认成 1 或 |）。
+let ort = null, det = null, rec = null, dict = null;
+
+async function grab(url, cacheName) {      // 下载一次，存进浏览器的 Cache Storage，下回直接拿
+  let cache = null;
+  try { cache = await caches.open(cacheName); } catch (e) { /* 没有 Cache Storage 就每次下 */ }
+  if (cache) {
+    const hit = await cache.match(url);
+    if (hit) { const b = await hit.arrayBuffer(); postMessage({ type: 'dl', url, got: b.byteLength, cached: true }); return b; }
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url.split('/').pop()} 没下载下来：HTTP ${res.status}`);
+  const reader = res.body.getReader(), parts = [];
+  let got = 0, last = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value); got += value.length;
+    if (got - last > 262144) { last = got; postMessage({ type: 'dl', url, got }); }
+  }
+  const buf = new Uint8Array(got);
+  let o = 0;
+  for (const p of parts) { buf.set(p, o); o += p.length; }
+  postMessage({ type: 'dl', url, got });
+  if (cache) { try { await cache.put(url, new Response(buf.slice())); } catch (e) { /* 存不下就算了，下回再下 */ } }
+  return buf.buffer;
+}
+
+async function init(m) {
+  if (rec) return;
+  ort = await import(m.ort + 'ort.wasm.min.mjs');
+  ort.env.wasm.numThreads = 1;
+  ort.env.logLevel = 'error';
+  ort.env.wasm.wasmPaths = m.ort;
+  ort.env.wasm.wasmBinary = await grab(m.ort + 'ort-wasm-simd-threaded.wasm', m.cache);
+  const opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+  dict = new TextDecoder().decode(await grab(m.dict, m.cache)).split('\n');
+  if (dict[dict.length - 1] === '') dict.pop();
+  det = await ort.InferenceSession.create(new Uint8Array(await grab(m.det, m.cache)), opt);
+  rec = await ort.InferenceSession.create(new Uint8Array(await grab(m.rec, m.cache)), opt);
+}
+
+// ---------------------------------------------------------------- 收拾图
+function gray(rgba, W, H) {
+  const g = new Uint8Array(W * H);
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 299 + rgba[j + 1] * 587 + rgba[j + 2] * 114) / 1000;
+  return g;
+}
+// 拍照的：透视让表上宽下窄、竖线不平行。表的顶线和底线实际一样长，拿它们的四个端点把整张图拉回长方形
+function solve8(A, b) {
+  const n = b.length, M = A.map((r, i) => r.concat([b[i]]));
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    if (Math.abs(M[c][c]) < 1e-12) return null;
+    for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  return M.map((r, i) => r[n] / r[i]);
+}
+function looksPhoto(g, W, H) {      // 图的四边一圈明显比中间暗：拍到了桌面
+  const bw = Math.max(4, Math.round(0.03 * Math.min(W, H)));
+  let es = 0, en = 0, cs = 0, cn = 0;
+  for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
+    const v = g[y * W + x];
+    if (x < bw || y < bw || x >= W - bw || y >= H - bw) { es += v; en++; } else if (x > W / 4 && x < 3 * W / 4 && y > H / 4 && y < 3 * H / 4) { cs += v; cn++; }
+  }
+  return en && cn && es / en < 0.6 * (cs / cn);
+}
+function tableQuad(L, W, H, photo) {
+  const hs = L.H.filter((h) => h.x1 - h.x0 > 0.25 * W);
+  if (hs.length < 2) return null;
+  const maxLen = Math.max(...hs.map((h) => h.x1 - h.x0));
+  const long = hs.filter((h) => h.x1 - h.x0 > 0.8 * maxLen).sort((a, b) => a.y0 + a.y1 - b.y0 - b.y1);
+  const top = long[0], bot = long[long.length - 1];
+  if ((bot.y0 + bot.y1) / 2 - (top.y0 + top.y1) / 2 < 0.08 * H) return null;
+  const vs = L.V.filter((v) => v.y1 - v.y0 > 0.5 * ((bot.y0 + bot.y1) / 2 - (top.y0 + top.y1) / 2));
+  const ks = vs.map((v) => (v.x1 - v.x0) / Math.max(1, v.y1 - v.y0));
+  const lt = top.x1 - top.x0, lb = bot.x1 - bot.x0;
+  const tilted = ks.length >= 2 ? Math.max(...ks) - Math.min(...ks) > 0.008 : photo && Math.abs(lt - lb) > 0.02 * Math.max(lt, lb);
+  if (!tilted) return null;
+  return [[top.x0, top.y0], [top.x1, top.y1], [bot.x1, bot.y1], [bot.x0, bot.y0]];
+}
+function warp(g, W, H, C) {
+  const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const tw = (d(C[0], C[1]) + d(C[3], C[2])) / 2, th = (d(C[0], C[3]) + d(C[1], C[2])) / 2;
+  const ox = C[0][0], oy = C[0][1];
+  const R = [[ox, oy], [ox + tw, oy], [ox + tw, oy + th], [ox, oy + th]], A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = R[i], [u, v] = C[i];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+  }
+  const h = solve8(A, b);
+  if (!h) return g;
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const z = h[6] * x + h[7] * y + 1;
+    out[y * W + x] = bilinear(g, W, H, (h[0] * x + h[1] * y + h[2]) / z, (h[3] * x + h[4] * y + h[5]) / z);
+  }
+  return out;
+}
+
+function flatten(g, W, H) {      // 压平阴影：每 32 像素一块估纸的亮度，除掉
+  const B = 32, bw = Math.ceil(W / B), bh = Math.ceil(H / B), bg = new Float32Array(bw * bh), hist = new Uint32Array(256);
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    hist.fill(0);
+    let n = 0;
+    const y1 = Math.min(H, (by + 1) * B), x1 = Math.min(W, (bx + 1) * B);
+    for (let y = by * B; y < y1; y += 2) for (let x = bx * B; x < x1; x += 2) { hist[g[y * W + x]]++; n++; }
+    let k = 255, acc = 0;
+    while (k > 0 && (acc += hist[k]) < n * 0.1) k--;
+    bg[by * bw + bx] = k;
+  }
+  const sm = new Float32Array(bw * bh);
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    let s = 0, n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const yy = by + dy, xx = bx + dx;
+      if (yy >= 0 && yy < bh && xx >= 0 && xx < bw) { s += bg[yy * bw + xx]; n++; }
+    }
+    sm[by * bw + bx] = s / n;
+  }
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const fy = Math.min(bh - 1, Math.max(0, (y + 0.5) / B - 0.5)), y0 = Math.floor(fy), y1 = Math.min(bh - 1, y0 + 1), wy = fy - y0;
+    for (let x = 0; x < W; x++) {
+      const fx = Math.min(bw - 1, Math.max(0, (x + 0.5) / B - 0.5)), x0 = Math.floor(fx), x1 = Math.min(bw - 1, x0 + 1), wx = fx - x0;
+      const b = (sm[y0 * bw + x0] * (1 - wx) + sm[y0 * bw + x1] * wx) * (1 - wy) + (sm[y1 * bw + x0] * (1 - wx) + sm[y1 * bw + x1] * wx) * wy;
+      const v = g[y * W + x] * 255 / Math.max(b, 40);
+      out[y * W + x] = v > 255 ? 255 : v;
+    }
+  }
+  return out;
+}
+function skew(g, W, H) {          // 歪了几度：字和线横着排得最齐的那个角度
+  const step = Math.max(2, Math.round(Math.sqrt(W * H / 250000)));
+  const xs = [], ys = [];
+  for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) if (g[y * W + x] < 128) { xs.push(x - W / 2); ys.push(y - H / 2); }
+  if (xs.length < 200) return 0;
+  const half = Math.hypot(W, H) / 2, nb = Math.ceil(half) + 2, hist = new Float64Array(nb);
+  const score = (deg) => {
+    const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    hist.fill(0);
+    for (let i = 0; i < xs.length; i++) hist[((ys[i] * c - xs[i] * s + half) / 2) | 0]++;
+    let v = 0;
+    for (let i = 0; i < nb; i++) v += hist[i] * hist[i];
+    return v;
+  };
+  let best = 0, bs = -1;
+  for (let d = -8; d <= 8.001; d += 0.25) { const v = score(d); if (v > bs) { bs = v; best = d; } }
+  const c0 = best;
+  for (let d = c0 - 0.25; d <= c0 + 0.25; d += 0.05) { const v = score(d); if (v > bs) { bs = v; best = d; } }
+  return best;
+}
+function bilinear(g, W, H, x, y) {
+  if (x < 0 || y < 0 || x > W - 1 || y > H - 1) return 255;
+  const x0 = x | 0, y0 = y | 0, x1 = Math.min(W - 1, x0 + 1), y1 = Math.min(H - 1, y0 + 1), wx = x - x0, wy = y - y0;
+  return (g[y0 * W + x0] * (1 - wx) + g[y0 * W + x1] * wx) * (1 - wy) + (g[y1 * W + x0] * (1 - wx) + g[y1 * W + x1] * wx) * wy;
+}
+function rotate(g, W, H, deg) {   // 转回正
+  const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = W / 2, cy = H / 2, out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = x - cx, dy = y - cy;
+    out[y * W + x] = bilinear(g, W, H, dx * c - dy * s + cx, dx * s + dy * c + cy);
+  }
+  return out;
+}
+
+// 表格线：横线、竖线各找一遍。允许线有点斜（拍照的透视），所以沿着线走的时候横向放宽几个像素
+function findRuns(dark, W, H, vert, r, minSeg, minLen, maxT) {
+  const U = vert ? H : W, V = vert ? W : H;
+  const segs = [], rowAt = new Int32Array(V + 1);
+  for (let v = 0; v < V; v++) {
+    rowAt[v] = segs.length / 3;
+    const k0 = Math.max(0, v - r), k1 = Math.min(V - 1, v + r);
+    let run = 0;
+    for (let u = 0; u <= U; u++) {
+      let on = 0;
+      if (u < U) for (let k = k0; k <= k1; k++) if (vert ? dark[u * W + k] : dark[k * W + u]) { on = 1; break; }
+      if (on) run++;
+      else { if (run >= minSeg) segs.push(v, u - run, u - 1); run = 0; }
+    }
+  }
+  rowAt[V] = segs.length / 3;
+  const n = segs.length / 3, par = new Int32Array(n);
+  for (let i = 0; i < n; i++) par[i] = i;
+  const find = (i) => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  const join = (i, j) => { i = find(i); j = find(j); if (i !== j) par[i] = j; };
+  for (let v = 0; v < V; v++) {
+    for (let i = rowAt[v]; i < rowAt[v + 1] - 1; i++) if (segs[3 * (i + 1) + 1] - segs[3 * i + 2] <= 3) join(i, i + 1);   // 同一行断开一点的
+    if (v === 0) continue;
+    let j = rowAt[v - 1];
+    for (let i = rowAt[v]; i < rowAt[v + 1]; i++) {
+      const a = segs[3 * i + 1], b = segs[3 * i + 2];
+      while (j < rowAt[v] && segs[3 * j + 2] < a - 1) j++;
+      for (let k = j; k < rowAt[v] && segs[3 * k + 1] <= b + 1; k++) join(i, k);
+    }
+  }
+  const G = new Map();
+  for (let i = 0; i < n; i++) {
+    const v = segs[3 * i], a = segs[3 * i + 1], b = segs[3 * i + 2], w = b - a + 1, m = (a + b) / 2, root = find(i);
+    let q = G.get(root);
+    if (!q) G.set(root, q = { u0: a, u1: b, sw: 0, su: 0, sv: 0, suu: 0, suv: 0 });
+    q.u0 = Math.min(q.u0, a); q.u1 = Math.max(q.u1, b);
+    q.sw += w; q.su += w * m; q.sv += w * v; q.suu += w * m * m + w * (w * w - 1) / 12; q.suv += w * m * v;   // 一段里每个像素都算一个点
+  }
+  const fit = (q) => {
+    const den = q.sw * q.suu - q.su * q.su, k = Math.abs(den) > 1e-9 ? (q.sw * q.suv - q.su * q.sv) / den : 0;
+    return [k, (q.sv - k * q.su) / q.sw];
+  };
+  const gs = [...G.values()].filter((q) => q.sw / (q.u1 - q.u0 + 1) - 2 * r <= maxT).sort((p, q) => p.u0 - q.u0);
+  for (let a = 0; a < gs.length; a++) {
+    const A = gs[a];
+    if (!A) continue;
+    for (let b = a + 1; b < gs.length; b++) {
+      const B = gs[b];
+      if (!B || B.u0 - A.u1 > 0.6 * minSeg || B.u0 <= A.u1) continue;
+      const [ka, ca] = fit(A), [kb, cb] = fit(B), at = (A.u1 + B.u0) / 2;
+      if (Math.abs(ca + ka * at - (cb + kb * at)) > 2.5) continue;
+      for (const f of ['sw', 'su', 'sv', 'suu', 'suv']) A[f] += B[f];
+      A.gap = (A.gap || 0) + (B.u0 - A.u1); A.u1 = Math.max(A.u1, B.u1);
+      gs[b] = null;
+    }
+  }
+  const out = [];
+  for (const q of gs) {
+    if (!q) continue;
+    const len = q.u1 - q.u0 + 1;
+    if (len < minLen) continue;
+    const t = q.sw / (len - (q.gap || 0)) - 2 * r;
+    if (t > maxT) continue;
+    const [k, c] = fit(q);
+    out.push({ u0: q.u0, u1: q.u1, k, c, t: Math.max(1, t) });
+  }
+  return out;
+}
+function findLines(g, W, H, s) {
+  const dark = new Uint8Array(W * H);
+  for (let i = 0; i < dark.length; i++) dark[i] = g[i] < 185 ? 1 : 0;
+  const minSeg = Math.max(10, Math.round(12 * s)), minLen = 24 * s, maxT = Math.max(4, 2.5 * s);
+  // 真的线两边是白纸；糊在一起的字里也能扫出长长一条黑，但它上下两边都是字的墨
+  const clear = (L, vert) => {
+    const off = L.t / 2 + 3;
+    let n = 0, both = 0;
+    for (let u = L.u0; u <= L.u1; u += 2) {
+      const v = L.c + L.k * u, a = Math.round(v - off), b = Math.round(v + off);
+      const px = (vv) => (vert ? (vv >= 0 && vv < W ? dark[u * W + vv] : 0) : (vv >= 0 && vv < H ? dark[vv * W + u] : 0));
+      n++;
+      if ((px(a) || px(a - 1)) && (px(b) || px(b + 1))) both++;
+    }
+    return both < 0.3 * n;
+  };
+  let hs = findRuns(dark, W, H, false, 1, minSeg, minLen, maxT).filter((L) => clear(L, false));
+  let vs = findRuns(dark, W, H, true, 2, minSeg, minLen, maxT).filter((L) => clear(L, true));
+  // 短线（不到 60 点）得碰着另一个方向的线才算表格线：字的横笔、竖笔连起来也能有这么长
+  const long = 60 * s, near = 3 * s;
+  const at = (L, u) => L.c + L.k * u;
+  const touch = (h, v) => { const x = at(v, at(h, (h.u0 + h.u1) / 2)), y = at(h, x); return x >= h.u0 - near && x <= h.u1 + near && y >= v.u0 - near && y <= v.u1 + near; };
+  const hs0 = hs, vs0 = vs;
+  hs = hs0.filter((h) => h.u1 - h.u0 >= long || vs0.some((v) => v.u1 - v.u0 >= long && touch(h, v)));
+  vs = vs0.filter((v) => v.u1 - v.u0 >= long || hs0.some((h) => h.u1 - h.u0 >= long && touch(h, v)));
+  for (const L of hs) for (let x = L.u0; x <= L.u1; x++) {      // 擦掉
+    const yc = L.c + L.k * x;
+    for (let y = Math.max(0, Math.floor(yc - L.t / 2 - 2.5)); y <= Math.min(H - 1, Math.ceil(yc + L.t / 2 + 2.5)); y++) g[y * W + x] = 255;
+  }
+  for (const L of vs) for (let y = L.u0; y <= L.u1; y++) {
+    const xc = L.c + L.k * y;
+    for (let x = Math.max(0, Math.floor(xc - L.t / 2 - 2.5)); x <= Math.min(W - 1, Math.ceil(xc + L.t / 2 + 2.5)); x++) g[y * W + x] = 255;
+  }
+  return {
+    H: hs.map((L) => ({ x0: L.u0, x1: L.u1 + 1, y0: L.c + L.k * L.u0, y1: L.c + L.k * L.u1 })),
+    V: vs.map((L) => ({ y0: L.u0, y1: L.u1 + 1, x0: L.c + L.k * L.u0, x1: L.c + L.k * L.u1, t: L.t })),
+  };
+}
+
+// ---------------------------------------------------------------- 找字（DB）
+async function detect(g, W, H) {
+  const k = Math.min(1, DET_SIDE / Math.max(W, H));                // 找字用小一点的图就够了，认字还是从原图上切
+  const dw = Math.max(32, Math.round(W * k / 32) * 32), dh = Math.max(32, Math.round(H * k / 32) * 32), N = dw * dh;
+  const x = new Float32Array(3 * N), M = [0.485, 0.456, 0.406], S = [0.229, 0.224, 0.225], fx = W / dw, fy = H / dh;
+  for (let y = 0; y < dh; y++) {
+    const sy = Math.min(H - 1, Math.floor((y + 0.5) * fy));
+    for (let xx = 0; xx < dw; xx++) {
+      const v = g[sy * W + Math.min(W - 1, Math.floor((xx + 0.5) * fx))] / 255, i = y * dw + xx;
+      x[i] = (v - M[0]) / S[0]; x[N + i] = (v - M[1]) / S[1]; x[2 * N + i] = (v - M[2]) / S[2];
+    }
+  }
+  const out = await det.run({ [det.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, dh, dw]) });
+  const prob = out[det.outputNames[0]].data;
+  const seen = new Uint8Array(N), stack = new Int32Array(N), boxes = [];
+  for (let i = 0; i < N; i++) {
+    if (seen[i] || prob[i] <= 0.3) continue;
+    let sp = 0, x0 = dw, x1 = 0, y0 = dh, y1 = 0, n = 0, sum = 0;
+    stack[sp++] = i; seen[i] = 1;
+    while (sp) {
+      const k = stack[--sp], yy = (k / dw) | 0, xk = k - yy * dw;
+      n++; sum += prob[k];
+      if (xk < x0) x0 = xk;
+      if (xk > x1) x1 = xk;
+      if (yy < y0) y0 = yy;
+      if (yy > y1) y1 = yy;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = yy + dy;
+        if (ny < 0 || ny >= dh) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = xk + dx;
+          if (nx < 0 || nx >= dw) continue;
+          const j = ny * dw + nx;
+          if (!seen[j] && prob[j] > 0.3) { seen[j] = 1; stack[sp++] = j; }
+        }
+      }
+    }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    if (Math.min(bw, bh) < 2 || sum / n < 0.6) continue;
+    const d = (bw * bh * 1.5) / (2 * (bw + bh));
+    boxes.push({ x0: Math.max(0, (x0 - d) * fx), y0: Math.max(0, (y0 - d) * fy), x1: Math.min(W, (x1 + 1 + d) * fx), y1: Math.min(H, (y1 + 1 + d) * fy), d: d * fy });
+  }
+  return boxes;
+}
+
+function splitAtLines(boxes, V) {
+  const out = [];
+  for (const b of boxes) {
+    const cy = (b.y0 + b.y1) / 2;
+    const cuts = V.filter((v) => cy >= v.y0 - 2 && cy <= v.y1 + 2)
+      .map((v) => ({ x: v.x0 + (v.x1 - v.x0) * (cy - v.y0) / Math.max(1, v.y1 - v.y0), m: v.t / 2 + 3 }))
+      .filter((c) => c.x > b.x0 + b.d && c.x < b.x1 - b.d).sort((p, q) => p.x - q.x);
+    let x0 = b.x0;
+    for (const c of cuts.concat([{ x: b.x1, m: 0 }])) {
+      if (c.x - c.m - x0 > b.d) out.push({ ...b, x0, x1: c.x - c.m });
+      x0 = c.x + c.m;
+    }
+  }
+  return out;
+}
+
+// det 的框四周放大过，常常盖到隔壁格的半个字，认出来就多一个字。认之前把框收紧到跟核心连着的墨上
+function tighten(g, W, H, boxes) {
+  const out = [];
+  for (const b of boxes) {
+    const h = Math.max(2, b.y1 - b.y0 - 2 * b.d), ya = Math.max(0, Math.round(b.y0 + 0.5 * b.d)), yb = Math.min(H - 1, Math.round(b.y1 - 0.5 * b.d));
+    const xa = Math.max(0, Math.floor(b.x0)), xb = Math.min(W - 1, Math.ceil(b.x1) - 1);
+    if (xb <= xa) continue;
+    const ink = new Uint8Array(xb - xa + 1);
+    for (let x = xa; x <= xb; x++) for (let y = ya; y <= yb; y++) if (g[y * W + x] < INK) { ink[x - xa] = 1; break; }
+    const c0 = Math.max(xa, Math.round(b.x0 + b.d)), c1 = Math.min(xb, Math.round(b.x1 - b.d));
+    let l = -1, r = -1;
+    for (let x = c0; x <= c1; x++) if (ink[x - xa]) { if (l < 0) l = x; r = x; }
+    if (l < 0) { out.push(b); continue; }
+    let t0 = -1, t1 = -1;                         // 墨有多高
+    for (let y = ya; y <= yb; y++) for (let x = l; x <= r; x++) if (g[y * W + x] < INK) { if (t0 < 0) t0 = y; t1 = y; break; }
+    const th = t0 < 0 ? h : t1 - t0 + 1;
+    const step = Math.max(2, 0.7 * th);
+    for (let x = l - 1, blank = 0; x >= xa; x--) { if (ink[x - xa]) { l = x; blank = 0; } else if (++blank > step) break; }
+    for (let x = r + 1, blank = 0; x <= xb; x++) { if (ink[x - xa]) { r = x; blank = 0; } else if (++blank > step) break; }
+    const m = 0.25 * th;
+    out.push({ ...b, x0: Math.max(b.x0, Math.min(c0, l - m)), x1: Math.min(b.x1, Math.max(c1 + 1, r + 1 + m)) });     // 核心本身不切
+  }
+  return out;
+}
+// 两个框认出来的字落在同一块墨上：留字多、把握大的那个
+function dedupe(words) {
+  const drop = new Set();
+  for (let i = 0; i < words.length; i++) for (let k = 0; k < words.length; k++) {
+    const a = words[i], b = words[k];
+    if (i === k || drop.has(i) || drop.has(k)) continue;
+    const oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0), ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+    if (oy < 0.5 * Math.min(a.y1 - a.y0, b.y1 - b.y0) || ox < 0.5 * (a.x1 - a.x0)) continue;
+    const sa = a.p.length + Math.min(...a.p), sb = b.p.length + Math.min(...b.p);
+    if (sa < sb || (sa === sb && i > k)) drop.add(i);
+  }
+  return words.filter((_, i) => !drop.has(i));
+}
+
+// ---------------------------------------------------------------- 认字（CTC），每个字带把握和大概的横坐标
+const CJK = /[⺀-鿿豈-﫿＀-￯　-〿]/, INK = 165;     // 比 INK 黑就算墨
+const DET_SIDE = 1600;                                 // 找字时图的长边
+async function recognize(g, W, H, boxes) {
+  const RH = 48, MAXW = 2400, BATCH = 8, words = [];
+  const jobs = boxes.map((b) => ({ b, cw: b.x1 - b.x0, ch: b.y1 - b.y0 })).filter((j) => j.cw >= 2 && j.ch >= 2);
+  for (const j of jobs) j.w = Math.max(16, Math.min(MAXW, Math.round(RH * j.cw / j.ch)));
+  jobs.sort((p, q) => p.w - q.w);
+  for (let k = 0; k < jobs.length; k += BATCH) {
+    const batch = jobs.slice(k, k + BATCH), mw = Math.ceil(batch[batch.length - 1].w / 8) * 8, plane = RH * mw;
+    const x = new Float32Array(batch.length * 3 * plane);      // 没填的地方是 0，跟 PaddleOCR 一样补灰
+    batch.forEach((j, bi) => {
+      const base = bi * 3 * plane, sx = j.cw / j.w, sy = j.ch / RH;
+      for (let oy = 0; oy < RH; oy++) {
+        const fy = j.b.y0 + (oy + 0.5) * sy - 0.5;
+        for (let ox = 0; ox < j.w; ox++) {
+          const v = bilinear(g, W, H, j.b.x0 + (ox + 0.5) * sx - 0.5, fy) / 127.5 - 1, i = base + oy * mw + ox;
+          x[i] = v; x[i + plane] = v; x[i + 2 * plane] = v;
+        }
+      }
+    });
+    const out = await rec.run({ [rec.inputNames[0]]: new ort.Tensor('float32', x, [batch.length, 3, RH, mw]) });
+    const o = out[rec.outputNames[0]], [, T, C] = o.dims;
+    if (C !== dict.length + 2) throw new Error(`字典对不上模型：模型 ${C} 类，字典 ${dict.length} 个字`);
+    batch.forEach((j, bi) => words.push(...decode(o.data, bi * T * C, T, C, j, mw, g, W, H)));
+  }
+  return words;
+}
+function decode(d, off, T, C, j, mw, g, W, H) {
+  const valid = Math.min(T, Math.ceil(T * j.w / mw) + 1), chars = [];
+  let prev = 0;
+  for (let t = 0; t < valid; t++) {
+    const o = off + t * C;
+    let best = 0, bp = -1;
+    for (let c = 0; c < C; c++) if (d[o + c] > bp) { bp = d[o + c]; best = c; }
+    if (best !== 0) {
+      if (best === prev && chars.length) { const ch = chars[chars.length - 1]; ch.t1 = t; ch.p = Math.max(ch.p, bp); }
+      else chars.push({ s: best === C - 1 ? ' ' : dict[best - 1], p: bp, t0: t, t1: t });
+    }
+    prev = best;
+  }
+  for (const c of chars) c.x = j.b.x0 + ((c.t0 + c.t1) / 2 + 0.5) * (mw / T) * (j.cw / j.w);
+  const gh = Math.max(4, j.ch - 2 * j.b.d);                     // 字大概多高（框是放大过的）
+  // 框里每一列有没有墨：按真实的空白分词（隔壁格的字常被连成一个框），量出每段字的真实左右边
+  const xa = Math.max(0, Math.floor(j.b.x0)), xb = Math.min(W - 1, Math.ceil(j.b.x1) - 1);
+  const cy = (j.b.y0 + j.b.y1) / 2, ya = Math.max(0, Math.round(cy - 0.6 * gh)), yb = Math.min(H - 1, Math.round(cy + 0.6 * gh));
+  const ink = new Uint8Array(Math.max(0, xb - xa + 1));
+  for (let x = xa; x <= xb; x++) for (let y = ya; y <= yb; y++) if (g[y * W + x] < INK) { ink[x - xa] = 1; break; }
+  const widest = (l, r) => {                  // l、r 之间最宽的一段空白
+    let best = null, run = 0;
+    for (let x = Math.max(xa, Math.ceil(l)); x <= Math.min(xb, Math.floor(r)); x++) {
+      if (!ink[x - xa]) { run++; if (!best || run > best[1] - best[0] + 1) best = [x - run + 1, x]; } else run = 0;
+    }
+    return best;
+  };
+  // 这个框的墨有多高 → 字号；比字号的 0.75 还宽的空白就是格子之间的缝（跟拼表那边一个门槛）
+  let top = -1, bot = -1;
+  for (let y = Math.max(0, Math.floor(j.b.y0)); y < Math.min(H, Math.ceil(j.b.y1)); y++) {
+    for (let x = xa; x <= xb; x++) if (g[y * W + x] < INK) { if (top < 0) top = y; bot = y; break; }
+  }
+  const cjk = chars.some((c) => CJK.test(c.s));
+  const fsb = top < 0 ? gh : (bot - top + 1) / (cjk ? 0.9 : 0.72);
+  const SPLIT = Math.max(3, 0.75 * fsb), STEP = Math.max(2, 0.35 * fsb);
+  const segs = [{ cs: [], l: j.b.x0, r: j.b.x1 }];
+  let last = null;
+  for (const c of chars) {
+    const cur = segs[segs.length - 1];
+    if (c.s === ' ' || c.s === '　') { if (cur.cs.length) cur.cs.push({ s: ' ', p: c.p }); continue; }
+    if (last) {
+      const gap = widest(last.x, c.x), w = gap ? gap[1] - gap[0] + 1 : 0;
+      if (w >= SPLIT) { cur.r = gap[0]; segs.push({ cs: [], l: gap[1] + 1, r: j.b.x1 }); }
+      else if (w >= 0.25 * fsb && CJK.test(last.s) !== CJK.test(c.s) && cur.cs.length && cur.cs[cur.cs.length - 1].s !== ' ') cur.cs.push({ s: ' ', p: 1 });
+    }
+    segs[segs.length - 1].cs.push(c);
+    last = c;
+  }
+  const inkAt = (x) => x >= xa && x <= xb && ink[x - xa];
+  const words = [];
+  for (const sg of segs) {
+    const cs = sg.cs.filter((c) => c.s !== ' ');
+    if (!cs.length) continue;
+    const l = Math.max(xa, Math.ceil(sg.l)), r = Math.min(xb, Math.floor(sg.r));
+    let any = false;
+    for (let x = l; x <= r && !any; x++) any = inkAt(x);
+    if (!any) continue;                          // 这段一点墨都没有：CTC 多吐出来的字
+    // 从字的中心往两边走，穿过墨，碰到够宽的空白就停：这段字真实的左右边
+    const walk = (from, dir, lim) => {
+      let edge = null, blank = 0;
+      for (let x = Math.round(from); dir < 0 ? x >= lim : x <= lim; x += dir) {
+        if (inkAt(x)) { edge = x; blank = 0; } else if (edge !== null && ++blank > STEP) break;
+      }
+      return edge;
+    };
+    const a = cs[0], b = cs[cs.length - 1];
+    const e0 = walk(a.x, -1, l), e1 = walk(b.x, 1, r), f0 = walk(a.x, 1, r), f1 = walk(b.x, -1, l);
+    const x0 = e0 !== null ? e0 : f0 !== null ? f0 : Math.max(sg.l, a.x - 0.3 * fsb);
+    const x1 = (e1 !== null ? e1 : f1 !== null ? f1 : Math.min(sg.r, b.x + 0.3 * fsb)) + 1;
+    if (x1 <= x0) continue;
+    let t0 = -1, t1 = -1;
+    for (let y = Math.max(0, Math.floor(j.b.y0)); y < Math.min(H, Math.ceil(j.b.y1)); y++) {
+      for (let x = Math.floor(x0); x < Math.ceil(x1); x++) if (g[y * W + x] < INK) { if (t0 < 0) t0 = y; t1 = y; break; }
+    }
+    const str = sg.cs.map((c) => c.s).join('').replace(/\s+/g, ' ').trim();
+    const ih = t0 < 0 ? gh : t1 - t0 + 1;
+    words.push({ s: str, p: cs.map((c) => +c.p.toFixed(4)), x0, x1, y0: t0 < 0 ? j.b.y0 : t0, y1: t0 < 0 ? j.b.y1 : t1 + 1, cy: (j.b.y0 + j.b.y1) / 2,
+      gh: ih / (CJK.test(str) ? 0.9 : /[gjpqy(),]/.test(str) ? 0.95 : 0.72) });
+  }
+  return words;
+}
+
+self.onmessage = async (e) => {
+  const m = e.data;
+  try {
+    if (m.type === 'init') { await init(m); postMessage({ type: 'ok', id: m.id }); return; }
+    const t0 = performance.now();
+    const raw = gray(new Uint8ClampedArray(m.rgba), m.W, m.H), photo = looksPhoto(raw, m.W, m.H);
+    let g = flatten(raw, m.W, m.H);
+    const angle = skew(g, m.W, m.H);
+    if (Math.abs(angle) >= 0.1) g = rotate(g, m.W, m.H, angle);
+    let g2 = g.slice(), lines = findLines(g2, m.W, m.H, m.s);       // findLines 会把线擦掉，先在副本上找
+    const quad = tableQuad(lines, m.W, m.H, photo);
+    if (quad) { g2 = warp(g, m.W, m.H, quad); lines = findLines(g2, m.W, m.H, m.s); }
+    g = g2;
+    if (m.type === 'prep') { postMessage({ type: 'ok', id: m.id, gray: g.buffer, angle, quad, ...lines }, [g.buffer]); return; }
+    const t1 = performance.now();
+    const boxes = tighten(g, m.W, m.H, splitAtLines(await detect(g, m.W, m.H), lines.V));
+    const t2 = performance.now();
+    const words = dedupe(await recognize(g, m.W, m.H, boxes));
+    const out = { type: 'ok', id: m.id, words, angle, quad, ...lines, ms: { prep: t1 - t0, det: t2 - t1, rec: performance.now() - t2 }, boxes: boxes.length };
+    if (m.debug) { out.gray = g.buffer; out.dbox = boxes; }
+    postMessage(out, m.debug ? [g.buffer] : []);
+  } catch (err) {
+    postMessage({ type: 'error', id: m.id, message: String((err && err.message) || err) });
+  }
+};
+</script>
+
 <script type="module">
 // 扒表僧：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const Q = new URLSearchParams(location.search);
@@ -550,8 +1065,9 @@ function gridTables(pg) {
     mine.forEach((it) => claimed.add(it));
     let cells = Array.from({ length: nr }, () => Array(nc).fill(null));
     let merges = [];
+    const src = new Map();       // 每格是哪几块字拼的：本地认字要看每个字的把握
     for (const G of groups.values()) {
-      if (G.parts.length) cells[G.r0][G.c0] = cellText(G.parts);
+      if (G.parts.length) { cells[G.r0][G.c0] = cellText(G.parts); src.set(`${G.r0},${G.c0}`, G.parts); }
       if (G.r1 > G.r0 || G.c1 > G.c0) merges.push([G.r0, G.c0, G.r1, G.c1]);
     }
     // 整行空的扔掉（不在纵向合并里的）
@@ -564,7 +1080,9 @@ function gridTables(pg) {
     const remap = new Map(keep.map((r, i) => [r, i]));
     cells = keep.map((r) => cells[r]);
     merges = merges.filter((mg) => remap.has(mg[0]) && remap.has(mg[2])).map((mg) => [remap.get(mg[0]), mg[1], remap.get(mg[2]), mg[3]]);
-    tables.push(finishTable({ kind: 'grid', cells, merges, top: ys[0], bottom: ys[nr], ncols: nc, cols: xs.slice(0, -1).map((x, i) => [x, xs[i + 1]]) }));
+    const src2 = new Map();
+    for (const [k, v] of src) { const [r, c] = k.split(',').map(Number); if (remap.has(r)) src2.set(`${remap.get(r)},${c}`, v); }
+    tables.push(finishTable({ kind: 'grid', cells, merges, src: src2, top: ys[0], bottom: ys[nr], ncols: nc, cols: xs.slice(0, -1).map((x, i) => [x, xs[i + 1]]) }));
   }
   return { tables, claimed };
 }
@@ -594,6 +1112,7 @@ function headerCount(cells, merges) {
 function finishTable(t) {
   t.headerRows = headerCount(t.cells, t.merges);
   t.flags = new Map();
+  t.src = t.src || new Map();
   return t;
 }
 
@@ -607,7 +1126,7 @@ function place(seg, cols) {
   cols.forEach((c, i) => { const d = mid < c[0] ? c[0] - mid : mid > c[1] ? mid - c[1] : 0; if (d < bd) { bd = d; best = i; } });
   return [best, best];
 }
-function streamTables(lines) {
+function streamTables(lines, minRows = 2) {
   const runs = [];
   let cur = null;
   const gapOk = (a, b, run) => {
@@ -628,7 +1147,7 @@ function streamTables(lines) {
   }
   const out = [];
   for (const run of runs) {
-    if (run.lines.filter((L) => L.segs.length >= 2).length < 2) continue;
+    if (run.lines.filter((L) => L.segs.length >= 2).length < minRows) continue;
     const t = buildStream(run.lines);
     if (t) out.push(t);
   }
@@ -655,26 +1174,29 @@ function buildStream(lines) {
   for (let i = 1; i < body.length; i++) pitches.push(body[i - 1].y - body[i].y);
   const pitch = pitches.length ? [...pitches].sort((p, q) => p - q)[pitches.length >> 1] : 0;
   body.forEach((L, i) => {
-    const row = Array(nc).fill(null);
+    const row = Array(nc).fill(null), src = Array(nc).fill(null);
     const span = [];
     for (const s of L.segs) {
       const [a, b] = place(s, cols);
       row[a] = row[a] == null ? s.s : row[a] + ' ' + s.s;
+      src[a] = (src[a] || []).concat(s.parts);
       if (b > a) span.push(a);
     }
     const filled = row.filter((v) => v != null).length;
     const prevRow = rows[rows.length - 1];
     if (i > 0 && prevRow && !dataLine(L) && filled <= Math.max(1, nc / 2 - 1) && pitch && (body[i - 1].y - L.y) < 0.75 * pitch) {
       row.forEach((v, c) => { if (v != null) prevRow.cells[c] = prevRow.cells[c] == null ? v : prevRow.cells[c] + (cjkEdge(prevRow.cells[c], v) ? '' : ' ') + v; });
+      src.forEach((v, c) => { if (v) prevRow.src[c] = (prevRow.src[c] || []).concat(v); });
       return;                 // 折行：接到上一行
     }
-    rows.push({ cells: row, span });
+    rows.push({ cells: row, span, src });
   });
   // 表头
   const { hcells, hmerges } = streamHeader(band, cols);
   const cells = hcells.concat(rows.map((r) => r.cells));
   const t = finishTable({ kind: 'stream', cells, merges: hmerges, top: lines[0].y + lines[0].fs, bottom: lines[lines.length - 1].y - 0.3 * lines[lines.length - 1].fs, ncols: nc, cols });
   t.headerRows = hcells.length;
+  rows.forEach((r, i) => r.src.forEach((v, c) => { if (v) t.src.set(`${hcells.length + i},${c}`, v); }));
   rows.forEach((r, i) => r.span.forEach((c) => t.flags.set(`${hcells.length + i},${c}`, { why: '这格的字跨到了隔壁列，分列可能不对', color: 'y' })));
   return t;
 }
@@ -731,7 +1253,7 @@ function pageTables(pg) {
   const { tables: grids, claimed } = gridTables(pg);
   const rest = pg.items.filter((it) => !claimed.has(it));
   const lines = toLines(rest);
-  const streams = streamTables(lines);
+  const streams = streamTables(lines, pg.ocr ? 3 : 2);
   const all = [...grids, ...streams].sort((p, q) => q.top - p.top);
   // 不在表里的行：判断表是不是贴着页底 / 页顶，找表的标题
   const free = lines.filter((L) => !all.some((t) => L.y <= t.top + 0.5 && L.y >= t.bottom - 0.5));
@@ -741,6 +1263,7 @@ function pageTables(pg) {
     t.caption = above ? above.segs.map((s) => s.s).join(' ') : '';
   }
   pg.free = free;
+  if (!pg.ocr) for (const t of all) delete t.src;
   return all;
 }
 function sameHeader(a, b) {
@@ -925,7 +1448,8 @@ class Engine {
       const [i, key] = this.keys.pick();
       if (i === null) {
         const secs = Math.max(0, (key - Date.now()) / 1000);
-        this.say(secs > 120 ? `所有钥匙今天的额度都用完了，等到 ${when(key)} 刷新后接着干（这个页面别关）` : `每分钟次数到顶，等 ${Math.ceil(secs)} 秒`);
+        if (secs > 120) throw new Fatal(`所有钥匙今天的额度都用完了，${when(key)} 刷新`);      // 不干等到半夜：剩下的页本地认
+        this.say(`每分钟次数到顶，等 ${Math.ceil(secs)} 秒`);
         await this.sleep(Math.max(0, key - Date.now()));
         continue;
       }
@@ -1053,8 +1577,213 @@ async function readScan(doc, pg, eng) {
   });
 }
 
+// ================================================================ 本地认字：扫描页没钥匙（或谷歌出岔子）时，在浏览器里自己认，不上传
+// 活在 Worker 里（上面 #ocr-src 那段）。模型放在本仓库 models/，第一次下完存进 Cache Storage，以后不再下。
+const ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/';
+const OCR_FILES = { det: 'models/ppocrv5_mobile_det.onnx', rec: 'models/ppocrv5_mobile_rec.onnx', dict: 'models/ppocrv5_dict.txt' };
+const OCR_BYTES = 14848852 + 4826518 + 16534782 + 74012;       // 解压后的总量，算进度用
+const OCR_MB = 25;              // 第一次实际要下的量：ORT 的 wasm 走 br 压缩约 3.2 MB，加两个模型 21.4 MB，加字典
+const OCR_CACHE = 'pabiao-ocr-1';
+const OCR_SIDE = 2048;          // 扫描页渲染成长边 2048 像素再认
+const OCR_FS = 1.0;             // 字框的「核」高 → 字号
+const OCR_SURE_NUM = 0.9, OCR_SURE_TEXT = 0.6;     // 每个字的把握低于这个就标黄
+const OCR_ENGINE = (LOCAL && Q.get('ocr')) || 'paddle';   // 本机测试可以换成 tess 跟 Tesseract.js 比
+
+const OCR = { w: null, ready: null, seq: 0, wait: new Map(), got: {} };
+function ocrWorker() {
+  if (OCR.w) return OCR.w;
+  const url = URL.createObjectURL(new Blob([$('#ocr-src').textContent], { type: 'text/javascript' }));
+  const w = OCR.w = new Worker(url, { type: 'module' });
+  w.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === 'dl') {
+      OCR.got[m.url] = m.got;
+      if (!m.cached) {
+        const pct = Math.min(99, Math.round(Object.values(OCR.got).reduce((p, q) => p + q, 0) / OCR_BYTES * 100));
+        say(`第一次认扫描件，先下 ${OCR_MB} MB 的眼珠子，存进浏览器，下回不用再下 · ${pct}%`);
+      }
+      return;
+    }
+    const p = OCR.wait.get(m.id);
+    if (!p) return;
+    OCR.wait.delete(m.id);
+    if (m.type === 'error') p.bad(new Error(m.message)); else p.ok(m);
+  };
+  w.onerror = (e) => {
+    e.preventDefault();
+    for (const p of OCR.wait.values()) p.bad(new Error(`本地认字的程序没跑起来：${e.message || '多半是网不好，库没下载下来'}`));
+    OCR.wait.clear(); OCR.w = null; OCR.ready = null;
+  };
+  return w;
+}
+function ocrCall(msg, transfer = []) {
+  const w = ocrWorker(), id = ++OCR.seq;
+  return new Promise((ok, bad) => { OCR.wait.set(id, { ok, bad }); w.postMessage({ ...msg, id }, transfer); });
+}
+function ocrReady() {
+  const abs = (p) => new URL(p, location.href).href;
+  if (!OCR.ready) {
+    OCR.ready = ocrCall({ type: 'init', ort: ORT, det: abs(OCR_FILES.det), rec: abs(OCR_FILES.rec), dict: abs(OCR_FILES.dict), cache: OCR_CACHE })
+      .catch((e) => { OCR.ready = null; throw e; });
+  }
+  return OCR.ready;
+}
+
+async function ocrRender(doc, no) {
+  const page = await doc.getPage(no);
+  const vp0 = page.getViewport({ scale: 1 });
+  const s = Math.min(4, OCR_SIDE / Math.max(vp0.width, vp0.height));
+  const vp = page.getViewport({ scale: s });
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  await page.render({ canvasContext: ctx, canvas: cv, viewport: vp }).promise;
+  const im = ctx.getImageData(0, 0, cv.width, cv.height);
+  cv.width = cv.height = 0;
+  page.cleanup();
+  return { rgba: im.data.buffer, W: im.width, H: im.height, s };
+}
+
+async function tessWords(r) {            // 只在本机比较用：同一张收拾过的图交给 Tesseract.js
+  if (!window.Tesseract) {
+    await new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js'; sc.onload = ok; sc.onerror = bad; document.head.append(sc); });
+  }
+  OCR.tess = OCR.tess || await window.Tesseract.createWorker(['chi_sim', 'eng'], 1);
+  const cv = document.createElement('canvas');
+  cv.width = r.W; cv.height = r.H;
+  const ctx = cv.getContext('2d'), im = ctx.createImageData(r.W, r.H), g = new Uint8Array(r.gray);
+  for (let i = 0; i < g.length; i++) { im.data[4 * i] = im.data[4 * i + 1] = im.data[4 * i + 2] = g[i]; im.data[4 * i + 3] = 255; }
+  ctx.putImageData(im, 0, 0);
+  const { data } = await OCR.tess.recognize(cv, {}, { blocks: true });
+  const words = [];
+  for (const b of data.blocks || []) for (const pa of b.paragraphs) for (const ln of pa.lines) for (const w of ln.words) {
+    const s = w.text.trim();
+    if (!s) continue;
+    const gh = Math.min(ln.bbox.y1 - ln.bbox.y0, 2.2 * (w.bbox.y1 - w.bbox.y0)) / 1.25;
+    words.push({ s, p: (w.symbols || []).map((y) => y.confidence / 100), x0: w.bbox.x0, x1: w.bbox.x1, y0: w.bbox.y0, y1: w.bbox.y1, gh });
+  }
+  return words;
+}
+
+// 认一页扫描件：字和格线换算成跟文字层一样的坐标（点，y 朝上），交给同一套拼表
+async function readLocal(doc, pg) {
+  await ocrReady();
+  const img = await ocrRender(doc, pg.no);
+  const t0 = performance.now();
+  let r;
+  if (OCR_ENGINE === 'tess') {
+    r = await ocrCall({ type: 'prep', ...img }, [img.rgba]);
+    r.words = await tessWords({ ...r, W: img.W, H: img.H });
+  } else r = await ocrCall({ type: 'page', ...img, debug: !!(LOCAL && Q.get('debug')) }, [img.rgba]);
+  if (r.gray) {          // 本机调试：把收拾过的图和框画出来给测试脚本存
+    const cv = document.createElement('canvas');
+    cv.width = img.W; cv.height = img.H;
+    const ctx = cv.getContext('2d'), im = ctx.createImageData(img.W, img.H), g = new Uint8Array(r.gray);
+    for (let i = 0; i < g.length; i++) { im.data[4 * i] = im.data[4 * i + 1] = im.data[4 * i + 2] = g[i]; im.data[4 * i + 3] = 255; }
+    ctx.putImageData(im, 0, 0);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,0,0,.7)';
+    for (const b of r.dbox || []) ctx.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    ctx.strokeStyle = 'rgba(0,160,0,.8)';
+    for (const w of r.words) ctx.strokeRect(w.x0, w.y0, w.x1 - w.x0, w.y1 - w.y0);
+    ctx.strokeStyle = 'rgba(0,0,255,.6)';
+    for (const h of r.H) { ctx.beginPath(); ctx.moveTo(h.x0, h.y0); ctx.lineTo(h.x1, h.y1); ctx.stroke(); }
+    for (const v of r.V) { ctx.beginPath(); ctx.moveTo(v.x0, v.y0); ctx.lineTo(v.x1, v.y1); ctx.stroke(); }
+    (T.ocrImgs = T.ocrImgs || []).push(cv.toDataURL('image/png'));
+  }
+  const { W, H, s } = img, Hpt = H / s;
+  const sizes = r.words.map((w) => w.gh / s).sort((p, q) => p - q), mid = sizes.length ? sizes[sizes.length >> 1] : 10;
+  const items = r.words.map((w) => {
+    const fs = Math.min(2.5 * mid, Math.max(0.7 * mid, w.gh / s * OCR_FS)), cy = Hpt - (w.cy != null ? w.cy : (w.y0 + w.y1) / 2) / s;
+    return { s: w.s, x: w.x0 / s, x1: w.x1 / s, w: (w.x1 - w.x0) / s, y: cy - 0.3 * fs, fs, p: w.p };
+  });
+  const pp = {
+    no: pg.no, items, ocr: true, top: Hpt, bottom: 0, height: Hpt,
+    H: mergeLines(r.H.map((h) => ({ y: Hpt - (h.y0 + h.y1) / 2 / s, a: h.x0 / s, b: h.x1 / s })), 'y'),
+    V: mergeLines(r.V.map((v) => ({ x: (v.x0 + v.x1) / 2 / s, a: Hpt - v.y1 / s, b: Hpt - v.y0 / s })), 'x'),
+  };
+  const tables = pageTables(pp);
+  tables.forEach(ocrFix);
+  Object.assign(pg, { top: Hpt, bottom: 0, height: Hpt, free: pp.free, ocrLines: toLines(items).map((L) => L.segs.map((sg) => sg.s)) });
+  (T.ocr = T.ocr || []).push({ page: pg.no, engine: OCR_ENGINE, ms: Math.round(performance.now() - t0), parts: r.ms, angle: r.angle, quad: !!r.quad, boxes: r.boxes,
+    words: r.words.length, lines: [r.H.length, r.V.length], W, H, debug: LOCAL && Q.get('debug') ? r.words : undefined, hv: LOCAL && Q.get('debug') ? { H: r.H, V: r.V } : undefined });
+  return tables;
+}
+
+// 认完以后：数字列里认成字母的改回数字（标橙），没把握的标黄
+const CONFUSE = { O: '0', o: '0', D: '0', Q: '0', I: '1', l: '1', '|': '1', i: '1', '!': '1', Z: '2', z: '2', S: '5', s: '5', B: '8', G: '6', b: '6', g: '9', q: '9' };
+const goodNum = (v) => { const c = parseCell(v); return !!c && !c.warn && (c.t === 'n' || c.t === 'd' || !!c.code); };
+const tidyNum = (v) => half(v).replace(/，/g, ',').replace(/[。．]/g, '.').replace(/[—–－]/g, '-').replace(/([\d,.(+\-%$¥])\s+(?=[\d,.)%])/g, '$1');
+function ocrFix(t) {
+  const H = t.headerRows, R = t.cells.length, numCol = [];
+  for (let c = 0; c < t.ncols; c++) {
+    let n = 0, all = 0;
+    for (let r = H; r < R; r++) { const v = t.cells[r][c]; if (v == null || v === '') continue; all++; if (goodNum(tidyNum(v))) n++; }
+    numCol[c] = all > 0 && n >= 0.6 * all;
+  }
+  for (let r = H; r < R; r++) for (let c = 0; c < t.ncols; c++) {
+    const v = t.cells[r][c];
+    if (v == null) continue;
+    const key = `${r},${c}`, ps = (t.src.get(key) || []).flatMap((p) => p.p || []);
+    const sure = ps.length ? Math.min(...ps) : 1;
+    if (numCol[c] && /\d/.test(v)) {
+      let w = tidyNum(v);
+      if (!goodNum(w)) {
+        let bare = w.replace(/^[!|'`‘’":;,.]+|[!|'`‘’":;]+$/g, '');
+        if (/\)$/.test(bare) && !/^\(/.test(bare)) bare = bare.slice(0, -1);
+        const fixed = (goodNum(bare) ? bare : w).replace(/[ODQIl|i!ZzSsBGbgqo]/g, (ch) => CONFUSE[ch]);
+        if (fixed !== w && goodNum(fixed)) { t.flags.set(key, { why: `认出来是「${v}」，按数字改成了「${fixed}」`, color: 'o' }); w = fixed; }
+      }
+      if (w !== v) t.cells[r][c] = w;
+      if (!t.flags.has(key) && sure < OCR_SURE_NUM) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
+    } else if (sure < OCR_SURE_TEXT) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
+  }
+  // 数字列里别的行都有数、这行别的格也都有字，偏偏这格空着：多半是漏认了
+  for (let c = 0; c < t.ncols; c++) {
+    if (!numCol[c]) continue;
+    let filled = 0;
+    for (let r = H; r < R; r++) if (t.cells[r][c] != null && t.cells[r][c] !== '') filled++;
+    if (filled < 0.85 * (R - H)) continue;
+    for (let r = H; r < R; r++) {
+      if (t.cells[r][c] != null && t.cells[r][c] !== '') continue;
+      const rowFilled = t.cells[r].filter((v) => v != null && v !== '').length;
+      if (rowFilled >= 0.6 * t.ncols && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: '这列别的行都有数，这格空着，可能漏认了', color: 'y' });
+    }
+  }
+  // 同一列小数位数对不上的：多半是小数点没认出来，或者多认了一位
+  for (let c = 0; c < t.ncols; c++) {
+    if (!numCol[c]) continue;
+    const decs = [];
+    for (let r = H; r < R; r++) {
+      const v = t.cells[r][c], x = v == null ? null : parseCell(v);
+      if (x && x.t === 'n') decs.push([r, (half(v).match(/\.(\d+)/) || ['', ''])[1].length]);
+    }
+    const cnt = new Map();
+    decs.forEach(([, d]) => cnt.set(d, (cnt.get(d) || 0) + 1));
+    const [mode, n] = [...cnt].sort((p, q) => q[1] - p[1])[0] || [0, 0];
+    if (decs.length < 4 || n < 0.75 * decs.length) continue;
+    for (const [r, d] of decs) {
+      if (d !== mode && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: `这列别的都是 ${mode} 位小数，这格是 ${d} 位`, color: 'y' });
+    }
+  }
+  delete t.src;
+}
+
+async function localScans(pages, lo) {
+  try { await ocrReady(); } catch (e) { for (const p of pages) p.localError = e.message; return; }
+  let done = 0;
+  for (const pg of pages) {
+    say(`贫僧本地认字：第 ${pg.no} 页（${done + 1} / ${pages.length}）`);
+    try { pg.tables = await readLocal(job.doc, pg); pg.via = 'local'; pg.localError = ''; }
+    catch (e) { pg.localError = e.message || String(e); }
+    done++;
+    bar(lo + (0.92 - lo) * done / pages.length);
+  }
+}
+
 // ================================================================ 写 Excel
-const FILL = { y: 'FFFFF2CC', r: 'FFFFC7CE' };
+const FILL = { y: 'FFFFF2CC', o: 'FFF8CBAD', r: 'FFFFC7CE' };
 const thin = { style: 'thin', color: { argb: 'FFD1D1D6' } };
 const BORDER = { top: thin, left: thin, bottom: thin, right: thin };
 function colName(c) { let s = ''; c++; while (c) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; } return s; }
@@ -1132,7 +1861,7 @@ async function buildWorkbook(job) {
   }
   if (job.issues.length) {
     add([]);
-    add(['没扒成的页'], true);
+    add(['扫描页'], true);
     job.issues.forEach(([p, why]) => add([`第 ${p} 页`, why]));
   }
   if (job.fulltext) {
@@ -1212,9 +1941,12 @@ async function start(file) {
   }
 }
 
+// 扫描页：有钥匙先借谷歌（认两遍对答案）；没钥匙、或者谷歌出了岔子，就本地认，照样出表，不停下来
 async function scans() {
-  const todo = job.pages.filter((p) => p.scan && !p.tables);
+  const scanPages = job.pages.filter((p) => p.scan);
+  const todo = scanPages.filter((p) => p.via !== 'gemini');
   const keys = store.keys.filter(Boolean);
+  job.fatal = '';
   if (todo.length && keys.length) {
     const eng = new Engine(keys, store.model, say);
     job.engine = eng;
@@ -1226,29 +1958,35 @@ async function scans() {
         const pg = queue.shift();
         try {
           pg.tables = await readScan(job.doc, pg, eng);
+          pg.via = 'gemini';
           pg.error = '';
         } catch (e) {
           if (e instanceof Fatal) { eng.fatal = eng.fatal || e.message; eng.stop(); }
           if (e instanceof Stopped || e instanceof Fatal) return;
           pg.error = e instanceof ApiError ? e.raw() : `${e.name || 'Error'}：${e.message}`;
-          pg.tables = null;
         }
         done++;
         say(`扫描件 ${done} / ${todo.length} 页`);
-        bar(0.4 + 0.52 * done / todo.length);
+        bar(0.4 + 0.3 * done / todo.length);
       }
     };
     await Promise.all(Array.from({ length: Math.min(SCAN_AT_ONCE, todo.length) }, worker));
     if (eng.fatal) job.fatal = eng.fatal;
   }
+  const need = scanPages.filter((p) => !p.via);
+  if (need.length) await localScans(need, keys.length ? 0.7 : 0.4);
   await wrapUp();
 }
 
 async function wrapUp() {
   const pages = job.pages;
   job.issues = [];
-  for (const p of pages) {
-    if (p.scan && !p.tables) job.issues.push([p.no, p.error ? `扫描件，谷歌没认成：${p.error}` : (job.fatal ? `扫描件，没认：${job.fatal}` : '扫描件，没钥匙，没认')]);
+  for (const p of pages) {      // 扫描页每页怎么认的，写进「扒表记录」
+    if (!p.scan) continue;
+    const g = p.error || (p.via !== 'gemini' && job.fatal) || '';
+    if (!p.tables) job.issues.push([p.no, `扫描件，没认成：${p.localError || g || '不知道为啥'}`]);
+    else if (p.via === 'gemini') job.issues.push([p.no, '扫描件，谷歌认的（认两遍对答案）']);
+    else job.issues.push([p.no, g ? `扫描件，谷歌没认成（${g}），改成本地认的` : '扫描件，本地认的（没钥匙）']);
   }
   // 每次重新接一遍（补认了扫描页以后要重排）
   const fresh = pages.map((p) => ({ ...p, tables: (p.tables || []).map((t) => ({ ...t, cells: t.cells.map((r) => [...r]), merges: t.merges.map((m) => [...m]), flags: new Map(t.flags) })) }));
@@ -1257,10 +1995,11 @@ async function wrapUp() {
   job.pagesN = pages.length;
   const scanLeft = pages.filter((p) => p.scan && !p.tables);
   job.fulltext = null;
-  if (!job.tables.length && !scanLeft.length && !job.fatal) {
+  if (!job.tables.length && !scanLeft.length) {
     // 一张表都没有：正文按行放进 Excel，别吐空表
     job.fulltext = [];
     for (let p = 1; p <= job.doc.numPages; p++) {
+      if (pages[p - 1].ocrLines) { job.fulltext.push(...pages[p - 1].ocrLines); continue; }
       const page = await job.doc.getPage(p);
       const pg = await readPage(page, (await lib()).OPS);
       for (const L of toLines(pg.items)) job.fulltext.push(L.segs.map((s) => s.s));
@@ -1310,7 +2049,9 @@ function finish({ error = '', scanLeft = [] }) {
     $('#d-err').hidden = false;
   } else if (nt) {
     $('#d-title').textContent = `扒出 ${nt} 张表，${rows.toLocaleString()} 行`;
-    $('#d-line').textContent = flags ? `${flags} 格拿不准，表里标${red && red < flags ? '了红、黄' : red ? '红' : '黄'}了。Excel 已经下载。干完你核对就好了。` : 'Excel 已经下载。干完你核对就好了。';
+    const used = new Set(job.tables.flatMap((t) => [...t.flags.values()].map((f) => f.color)));
+    const names = [['y', '黄'], ['o', '橙'], ['r', '红']].filter(([c]) => used.has(c)).map(([, n]) => n).join('、');
+    $('#d-line').textContent = flags ? `${flags} 格拿不准，表里标了${names}。Excel 已经下载。干完你核对就好了。` : 'Excel 已经下载。干完你核对就好了。';
   } else if (job && job.fulltext) {
     $('#d-title').textContent = '翻遍了，没找到表';
     $('#d-line').textContent = job.fulltext.length ? '正文按行放进 Excel 了，凑合看。' : '这份 PDF 里一个字都没有。';
@@ -1319,31 +2060,33 @@ function finish({ error = '', scanLeft = [] }) {
     $('#d-title').textContent = scanLeft.length === (job.pages || []).length ? '这份是扫描件' : '有字的页里没找到表';
     $('#d-line').textContent = '';
   }
-  if (!error && scanLeft.length) {
-    const which = pagesText(scanLeft.map((p) => p.no));
-    if (job.fatal) {
-      $('#d-err').textContent = job.fatal;
-      $('#d-err').hidden = false;
-      if (/HTTP 404/.test(job.fatal)) l2(`第 ${which} 页是扫描件。模型名不对，点右上角 ⚙ 换个模型，再丢一次。下面是谷歌原话。`);
-      else { l2(`第 ${which} 页是扫描件，谷歌那边出了岔子，下面是谷歌原话。`); showKey(which, true); }
-    } else if (!store.keys.filter(Boolean).length) {
-      showKey(which, false);
-      if (nt) l2(`第 ${which} 页是扫描件，还没认。`);
-    } else {
-      const errs = scanLeft.filter((p) => p.error);
-      l2(`第 ${which} 页没认成，原因写在 Excel 的「扒表记录」里。`);
-      if (errs.length) { $('#d-err').textContent = errs.map((p) => `第 ${p.no} 页：${p.error}`).join('\n'); $('#d-err').hidden = false; }
+  const local = job && job.pages ? job.pages.filter((p) => p.scan && p.tables && p.via === 'local') : [];
+  if (!error && (scanLeft.length || local.length)) {
+    const gErr = [job.fatal, ...job.pages.filter((p) => p.scan && p.via !== 'gemini' && p.error).map((p) => `第 ${p.no} 页：${p.error}`)].filter(Boolean);
+    const lErr = scanLeft.filter((p) => p.localError).map((p) => `第 ${p.no} 页：${p.localError}`);
+    const errs = [...new Set(gErr.concat(lErr))];
+    if (errs.length) { $('#d-err').textContent = errs.join('\n'); $('#d-err').hidden = false; }
+    const say2 = [];
+    if (local.length) {
+      const which = pagesText(local.map((p) => p.no));
+      if (/HTTP 404/.test(job.fatal)) say2.push(`谷歌说模型名不对（原话在下面），第 ${which} 页先本地认了。点右上角 ⚙ 换个模型，再丢一次更准。`);
+      else if (gErr.length) { say2.push(`谷歌那边出了岔子（原话在下面），第 ${which} 页先本地认了。`); showKey(true); }
+      else { say2.push(`第 ${which} 页是扫描件，贫僧本地认的，没上传。眼神差点，贴把钥匙更准。`); showKey(false); }
     }
+    if (scanLeft.length) say2.push(`第 ${pagesText(scanLeft.map((p) => p.no))} 页没认成，原因在下面。`);
+    l2(say2.join(''));
   }
   renderPreview();
   T.phase = 'done';
-  T.result = { error, tables: nt, rows, flags, red, scanLeft: scanLeft.map((p) => p.no), fatal: job && job.fatal || '', title: $('#d-title').textContent };
+  T.result = { error, tables: nt, rows, flags, red, scanLeft: scanLeft.map((p) => p.no), fatal: job && job.fatal || '', title: $('#d-title').textContent,
+    via: job && job.pages ? job.pages.filter((p) => p.scan).map((p) => [p.no, p.via || '']) : [], line2: $('#d-line2').hidden ? '' : $('#d-line2').textContent };
 }
-function showKey(which, retry) {
+function showKey(retry) {
   $('#d-key').hidden = false;
+  $('#d-keyh').textContent = retry ? '换把钥匙，重认一遍' : '贴把钥匙，重认一遍';
   $('#d-keywhy').textContent = retry
-    ? '换一把钥匙贴进来，贫僧接着认。'
-    : `第 ${which} 页是拍的或扫的，没有字可抠。贫僧肉眼凡胎，得借谷歌的眼睛看，贴一把钥匙就接着干。`;
+    ? '换一把能用的钥匙贴进来，贫僧借谷歌的眼睛重认，Excel 再下一次。'
+    : '借谷歌的眼睛重认，每页认两遍对答案，Excel 再下一次。';
   $('#d-keyin').value = '';
 }
 
@@ -1416,7 +2159,7 @@ async function resumeWithKey(v) {
   store.keys = keys;
   if (!job || !job.doc) return;
   job.fatal = '';
-  for (const p of job.pages) if (p.scan && !p.tables) p.error = '';
+  for (const p of job.pages) if (p.scan && p.via !== 'gemini') p.error = '';
   show('s-work'); bar(0.4);
   try { await scans(); } catch (e) { finish({ error: e.message || String(e) }); }
 }
