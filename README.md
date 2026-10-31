@@ -17,6 +17,7 @@ PDF 丢进来，Excel 自己下载。扫描件也认得。千手院（QIANSHOU L
 | `samples/` | 自造的样本 PDF 和标准答案 `answers.json`，内容全是编的 |
 | `tests/make_samples.py` | 造样本 |
 | `tests/run_e2e.py` | 本机起服务（网页 + 假谷歌），用 Edge 跑全部样本，逐格对答案 |
+| `tests/check_live.py` | 上线后自检：打开线上网址，丢样本进去对答案 |
 | `docs/设计记录.md` | 为什么这么做 |
 
 跑测试：
