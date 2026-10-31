@@ -1,0 +1,1446 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>扒表僧 · 施主丢卷，贫僧扒表</title>
+<meta name="description" content="PDF 丢进来，Excel 自己下载。扫描件也认得。网页版，电脑、手机都能用。">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F5F5F7">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2334C77B'/%3E%3Cstop offset='1' stop-color='%23189A55'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Crect x='14' y='16' width='36' height='32' rx='4' fill='%23fff'/%3E%3Cpath d='M14 27h36M14 37h36M26 16v32M38 16v32' stroke='%23189A55' stroke-width='2.4'/%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous" defer></script>
+<style>
+  :root {
+    --bg: #F5F5F7; --card: #FFFFFF; --text: #1D1D1F; --grey: #6E6E73; --grey2: #86868B; --line: #E5E5EA;
+    --blue: #0071E3; --blue-hover: #0077ED; --link: #0066CC; --green: #1D9A55; --fill: #F5F5F7;
+    --yellow: #FFF2CC; --red: #FFD9DD; --red-text: #B3261E;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); font-size: 17px; line-height: 1.47; letter-spacing: -.01em;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "SF Pro Text", "PingFang SC", "Helvetica Neue",
+                 "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
+  }
+  button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  [hidden] { display: none !important; }
+
+  /* 顶栏：苹果那种半透明细条 */
+  .nav { position: sticky; top: 0; z-index: 5; height: 48px; background: rgba(245, 245, 247, .8);
+         backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+  .nav .in { max-width: 980px; margin: 0 auto; height: 100%; padding: 0 22px; display: flex; align-items: center; gap: 10px; }
+  .nav .brand { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .nav .brand svg { width: 22px; height: 22px; }
+  .nav .sp { flex: 1; }
+  .icon-btn { width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--grey);
+              display: grid; place-items: center; cursor: pointer; transition: background .15s, color .15s; }
+  .icon-btn:hover { background: rgba(0, 0, 0, .06); color: var(--text); }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 56px 22px 40px; }
+  .hero { text-align: center; margin-bottom: 40px; }
+  .hero h1 { margin: 0; font-size: 56px; line-height: 1.07; font-weight: 700; letter-spacing: -.015em; }
+  .hero .sub { margin: 10px 0 0; font-size: 28px; line-height: 1.14; font-weight: 600; }
+  .hero .lead { margin: 14px 0 0; font-size: 19px; color: var(--grey); }
+
+  .card { background: var(--card); border-radius: 22px; box-shadow: 0 2px 6px rgba(0, 0, 0, .03), 0 12px 40px rgba(0, 0, 0, .05);
+          max-width: 720px; margin: 0 auto; padding: 36px; }
+
+  /* 选文件 */
+  .drop { border-radius: 18px; background: var(--fill); padding: 48px 24px; text-align: center; cursor: pointer;
+          border: 2px solid transparent; transition: border-color .15s, background .15s; user-select: none; }
+  .drop:hover { background: #EFEFF2; }
+  .drop.over { border-color: var(--blue); background: #EEF5FE; }
+  .drop svg { width: 56px; height: 56px; color: var(--blue); }
+  .drop .t { font-size: 21px; font-weight: 600; margin-top: 14px; }
+  .drop .h { color: var(--grey); font-size: 15px; margin-top: 4px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 22px;
+         border-radius: 980px; border: 0; cursor: pointer; font-size: 17px; white-space: nowrap; text-decoration: none !important;
+         background: var(--blue); color: #fff; transition: background .15s, opacity .15s; }
+  .btn:hover { background: var(--blue-hover); }
+  .btn.ghost { background: transparent; color: var(--link); padding: 0 14px; }
+  .btn.ghost:hover { background: rgba(0, 113, 227, .07); }
+  .btn.grey { background: #E8E8ED; color: var(--text); }
+  .btn.grey:hover { background: #DEDEE3; }
+  .drop .btn { margin-top: 22px; pointer-events: none; }
+  .note { text-align: center; color: var(--grey2); font-size: 13px; margin: 18px 0 0; }
+
+  /* 干活中 */
+  .file { display: flex; align-items: center; gap: 14px; }
+  .file svg { width: 40px; height: 40px; flex: none; color: var(--blue); }
+  .file .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file .m { color: var(--grey); font-size: 15px; }
+  .bar { height: 6px; border-radius: 3px; background: #E8E8ED; overflow: hidden; margin: 26px 0 14px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--blue); border-radius: 3px; transition: width .25s; }
+  .say { color: var(--grey); font-size: 15px; text-align: center; margin: 0; }
+  .status { color: var(--grey2); font-size: 13px; text-align: center; margin: 6px 0 0; min-height: 1.3em; word-break: break-all; }
+
+  /* 干完 */
+  .done-head { text-align: center; }
+  .done-head .ok { width: 56px; height: 56px; color: var(--green); }
+  .done-head h2 { margin: 10px 0 0; font-size: 32px; line-height: 1.12; font-weight: 700; letter-spacing: -.01em; }
+  .done-head p { margin: 8px 0 0; color: var(--grey); }
+  .done-head p.warn { color: #8A5A00; }
+  .acts { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+
+  .keybox { margin-top: 26px; padding: 22px; border-radius: 16px; background: var(--fill); }
+  .keybox h3 { margin: 0; font-size: 19px; }
+  .keybox p { margin: 6px 0 14px; color: var(--grey); font-size: 15px; }
+  .keyrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .field { height: 44px; border: 1px solid #D2D2D7; background: #fff; border-radius: 12px; padding: 0 14px; min-width: 0;
+           flex: 1; outline: none; transition: border-color .15s, box-shadow .15s; font-size: 16px; }
+  .field:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0, 113, 227, .18); }
+  select.field { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236E6E73' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center; }
+  .err { margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: #FFF1F0; color: var(--red-text); font-size: 14px;
+         font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+
+  /* 预览 */
+  .preview { max-width: 980px; margin: 40px auto 0; }
+  .preview h2 { font-size: 24px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .preview > p { margin: 0 0 18px; color: var(--grey); font-size: 15px; }
+  .tcard { background: var(--card); border-radius: 18px; padding: 18px 18px 14px; margin-bottom: 16px;
+           box-shadow: 0 2px 6px rgba(0, 0, 0, .03), 0 8px 28px rgba(0, 0, 0, .04); }
+  .tcard .tt { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 4px 12px; }
+  .tcard .tt b { font-size: 17px; }
+  .tcard .tt span { color: var(--grey); font-size: 14px; }
+  .tcard .tt .flag { color: #8A5A00; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.pv { border-collapse: collapse; font-size: 13px; white-space: nowrap; min-width: 100%; }
+  table.pv th, table.pv td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  table.pv th { background: var(--fill); font-weight: 600; text-align: center; border: 1px solid #fff; }
+  table.pv td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.pv td.y { background: var(--yellow); }
+  table.pv td.r { background: var(--red); }
+  .more { color: var(--grey2); font-size: 13px; margin: 10px 4px 0; }
+
+  footer { text-align: center; color: var(--grey2); font-size: 12px; padding: 24px 22px 32px; }
+  footer a { color: var(--grey); }
+
+  /* ⚙ */
+  dialog { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 28px); }
+  dialog::backdrop { background: rgba(0, 0, 0, .28); backdrop-filter: blur(2px); }
+  .dcard { background: #fff; border-radius: 20px; padding: 26px; width: 520px; max-width: 100%;
+           box-shadow: 0 20px 60px rgba(0, 0, 0, .2); }
+  .dcard h2 { margin: 0 0 18px; font-size: 22px; }
+  .row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; align-items: center; margin-bottom: 12px; }
+  .row label { color: var(--grey); font-size: 15px; }
+  .row .hint { grid-column: 2; color: var(--grey2); font-size: 13px; margin-top: -6px; }
+  .by { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 16px; color: var(--grey); font-size: 14px; }
+  .dacts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+  .dacts .sp { flex: 1; }
+  .dacts .btn { height: 38px; font-size: 15px; padding: 0 16px; }
+
+  @media (max-width: 600px) {
+    main { padding: 32px 16px 24px; }
+    .hero { margin-bottom: 28px; }
+    .hero h1 { font-size: 40px; }
+    .hero .sub { font-size: 22px; }
+    .hero .lead { font-size: 17px; }
+    .card { padding: 20px; border-radius: 20px; }
+    .drop { padding: 36px 16px; }
+    .done-head h2 { font-size: 26px; }
+    .nav .in { padding: 0 14px; }
+    .row { grid-template-columns: 1fr; gap: 6px; }
+    .row .hint { grid-column: 1; margin-top: 0; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-doc" viewBox="0 0 48 48"><path fill="currentColor" d="M12 4h17l11 11v27a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm16 2.8V14a2 2 0 0 0 2 2h7.2zM16 23v2.4h16V23zm0 6v2.4h16V29zm0 6v2.4h10V35z" opacity=".95"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3" fill="currentColor"/><path d="M3 9.5h18M3 14.5h18M9 4v16M15 4v16" stroke="#fff" stroke-width="1.5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><path fill="currentColor" fill-rule="evenodd" d="M8.6 1.5h2.8l.4 2.3c.5.2 1 .5 1.5.8l2.2-.8 1.4 2.4-1.8 1.5c.1.5.1 1.1 0 1.6l1.8 1.5-1.4 2.4-2.2-.8c-.5.3-1 .6-1.5.8l-.4 2.3H8.6l-.4-2.3c-.5-.2-1-.5-1.5-.8l-2.2.8-1.4-2.4 1.8-1.5a5 5 0 0 1 0-1.6L3.1 6.2l1.4-2.4 2.2.8c.5-.3 1-.6 1.5-.8zM10 7.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26" fill="currentColor"/><path d="m17 29 7.5 7.5L40 21" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="nav"><div class="in">
+  <div class="brand"><svg style="color:var(--green)"><use href="#i-grid"/></svg>扒表僧</div>
+  <div class="sp"></div>
+  <button type="button" class="icon-btn" id="gear" aria-label="设置"><svg><use href="#i-gear"/></svg></button>
+</div></div>
+
+<main>
+  <div class="hero">
+    <h1>扒表僧</h1>
+    <p class="sub">施主丢卷，贫僧扒表</p>
+    <p class="lead">PDF 丢进来，Excel 自己下载。扫描件也认得。</p>
+  </div>
+
+  <section class="card" id="stage">
+    <!-- 选文件 -->
+    <div id="s-idle">
+      <div class="drop" id="drop" role="button" tabindex="0">
+        <svg><use href="#i-doc"/></svg>
+        <div class="t">把 PDF 丢这儿</div>
+        <div class="h">几十上百页也行，表跨页了贫僧给你接上</div>
+        <span class="btn">选 PDF</span>
+      </div>
+      <p class="note">文件就在你浏览器里拆，不上传。扫描件除外：那得借谷歌的眼睛看。</p>
+    </div>
+
+    <!-- 干活中 -->
+    <div id="s-work" hidden>
+      <div class="file"><svg><use href="#i-doc"/></svg><div style="min-width:0"><div class="n" id="w-name"></div><div class="m" id="w-meta"></div></div></div>
+      <div class="bar"><i id="w-bar"></i></div>
+      <p class="say">你可以去摸鱼了，剩下的交给老衲。</p>
+      <p class="status" id="w-status"></p>
+    </div>
+
+    <!-- 干完 / 卡住 -->
+    <div id="s-done" hidden>
+      <div class="done-head">
+        <svg class="ok" id="d-ok"><use href="#i-ok"/></svg>
+        <h2 id="d-title"></h2>
+        <p id="d-line"></p>
+        <p id="d-line2" class="warn" hidden></p>
+      </div>
+      <div class="keybox" id="d-key" hidden>
+        <h3>贴一把钥匙，接着就干</h3>
+        <p id="d-keywhy"></p>
+        <div class="keyrow">
+          <input class="field" id="d-keyin" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴钥匙（AIza… 或 AQ.…）">
+          <a class="btn ghost" href="/luruseng/key.html" target="_blank" rel="noopener">免费领钥匙</a>
+        </div>
+      </div>
+      <div class="err" id="d-err" hidden></div>
+      <div class="acts">
+        <button type="button" class="btn" id="d-save">再下载一次</button>
+        <button type="button" class="btn grey" id="d-again">换一份</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="preview" id="preview" hidden>
+    <h2>扒出来的样子</h2>
+    <p id="pv-note">每张表只放前几行。<span style="background:var(--yellow);padding:0 4px;border-radius:4px">黄格</span>是贫僧拿不准的，<span style="background:var(--red);padding:0 4px;border-radius:4px">红格</span>是谷歌几遍认得不一样的，Excel 里同样标着。</p>
+    <div id="pv"></div>
+  </section>
+</main>
+
+<footer>千手院 · QIANSHOU LAB　·　<a href="/" target="_blank" rel="noopener">千手院总舵</a></footer>
+
+<input type="file" id="pick" accept="application/pdf,.pdf" hidden>
+
+<dialog id="dlg-set"><div class="dcard">
+  <h2>设置</h2>
+  <div class="row"><label for="k1">钥匙 1</label><input class="field" id="k1" type="password" autocomplete="off" spellcheck="false" placeholder="只有扫描件才用得上"></div>
+  <div class="row"><label for="k2">钥匙 2</label><input class="field" id="k2" type="password" autocomplete="off" spellcheck="false" placeholder="备胎，平时空着"><div class="hint">1 号今天用完了自动换 2 号。钥匙只存在这个浏览器里。<a href="/luruseng/key.html" target="_blank" rel="noopener">免费领钥匙</a></div></div>
+  <div class="row"><label for="model">模型</label><select class="field" id="model"></select></div>
+  <div class="by">制作人：千手院方丈释手<span id="ver" style="float:right;color:var(--grey2)"></span></div>
+  <div class="dacts">
+    <a class="btn grey" href="/" target="_blank" rel="noopener">千手院总舵</a>
+    <a class="btn grey" id="mail" href="mailto:oilsongchengmin@gmail.com">方丈邮箱</a>
+    <span class="sp"></span>
+    <button type="button" class="btn" id="set-ok" autofocus>完成</button>
+  </div>
+</div></dialog>
+
+<script type="module">
+// 扒表僧：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
+const VERSION = '0.1.0';
+const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
+const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+const Q = new URLSearchParams(location.search);
+// 下面几项照抄录入僧网页版（QIANSHOULAB/luruseng web/core.js）
+const API_BASE = (LOCAL && Q.get('api')) || 'https://generativelanguage.googleapis.com/v1beta';   // 本机测试才许换成假谷歌
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+const MAX_SIDE = 2048, JPEG_Q = 0.92, TIMEOUT = 180, MINUTE_WAIT = 60, RETRY_WAITS = [10, 30, 60], MAX_MINUTE_WAITS = 30;
+const SPEED = LOCAL && Q.get('fast') ? 0.01 : 1;       // 本机测试把等待缩到 1%
+const SCAN_AT_ONCE = 3;
+
+const $ = (s) => document.querySelector(s);
+const T = window.__pabiao = { phase: 'idle', log: [] };   // 给测试脚本看的
+const tick = () => new Promise((ok) => setTimeout(ok, 0));
+
+// ================================================================ 格子里的字 → Excel 的值
+const CJK_RE = /[⺀-鿿豈-﫿＀-￯　-〿]/;
+function dwidth(s) { let n = 0; for (const ch of String(s)) n += CJK_RE.test(ch) ? 2 : 1; return n; }
+function half(s) {      // 全角数字、标点 → 半角，只用来比对和认数字
+  return String(s).replace(/[！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/　/g, ' ');
+}
+const NUM = /^(?:[1-9]\d{0,2}(?:,\d{3})+|[1-9]\d*|0)(?:\.\d+)?$/;
+function numFmt(body, paren, prefix) {
+  const dec = (body.split('.')[1] || '').length;
+  const grp = body.includes(',');
+  let f = (grp ? '#,##0' : '0') + (dec ? '.' + '0'.repeat(dec) : '');
+  if (prefix) f = `"${prefix}"${f}`;
+  if (paren) return `${f};(${f})`;
+  if (!grp && !dec && !prefix) return null;
+  return f;
+}
+// 返回 {t:'n', v, fmt} | {t:'d', v:[y,m,d], fmt} | {t:'s', v, code?, warn?} | null
+function parseCell(raw) {
+  if (raw == null) return null;
+  const shown = String(raw).replace(/\s+/g, ' ').trim();
+  if (!shown) return null;
+  let s = half(shown).replace(/[−‒–﹣]/g, '-').trim();
+  if (/^0\d+$/.test(s)) return { t: 's', v: shown, code: true };                       // 0 开头的编号：照字存
+  let m = s.match(/^(\d{4})([-/.])(\d{1,2})\2(\d{1,2})$/) || s.match(/^(\d{4})(年)(\d{1,2})月(\d{1,2})日$/);
+  if (m) {
+    const y = +m[1], mo = +m[3], d = +m[4];
+    const ok = mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    if (ok) {
+      const pad = m[3].length === 2 && m[4].length === 2;
+      const fmt = m[2] === '年' ? 'yyyy"年"m"月"d"日"' : `yyyy${m[2]}${pad ? 'mm' : 'm'}${m[2]}${pad ? 'dd' : 'd'}`;
+      return { t: 'd', v: [y, mo, d], fmt };
+    }
+    return { t: 's', v: shown, warn: '像日期，可日子不存在' };
+  }
+  let neg = false, paren = false, pct = false, prefix = '';
+  if (/^\(.*\)$/.test(s)) { paren = true; neg = true; s = s.slice(1, -1).trim(); }
+  if (/^[-+]/.test(s)) { neg = neg !== (s[0] === '-'); if (s[0] === '-' && paren) return weird(shown); s = s.slice(1).trim(); }
+  const cur = s.match(/^([¥$€£])\s?/);
+  if (cur) { prefix = cur[1]; s = s.slice(cur[0].length); }
+  if (s.endsWith('%')) { pct = true; s = s.slice(0, -1).trim(); }
+  if (NUM.test(s)) {
+    if (s.replace(/\D/g, '').replace(/^0+/, '').length > 15) return { t: 's', v: shown, code: true };   // 超过 15 位 Excel 存不准
+    let v = Number(s.replace(/,/g, ''));
+    if (neg) v = -v;
+    const dec = (s.split('.')[1] || '').length;
+    if (pct) return { t: 'n', v: Number((v / 100).toPrecision(15)), fmt: (s.includes(',') ? '#,##0' : '0') + (dec ? '.' + '0'.repeat(dec) : '') + '%' };
+    return { t: 'n', v, fmt: numFmt(s, paren, prefix) };
+  }
+  if (/\d/.test(s) && /^[-+(]?[\d,.\s]+%?\)?$/.test(half(shown).trim())) return weird(shown);
+  return { t: 's', v: shown };
+}
+function weird(shown) { return { t: 's', v: shown, warn: '像数字又不太像，照原样当文字放了' }; }
+const isYear = (txt) => /^(19|20)\d\d$/.test(half(txt).trim());
+const numish = (txt) => { const c = parseCell(txt); return !!c && (c.t === 'n' || c.t === 'd' || !!c.code); };
+
+// ================================================================ 读一页：字、格线、图片
+function mul(a, b) {
+  return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+}
+const apply = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+
+function geometry(ops, OPS) {
+  const H = [], V = [];
+  let images = 0, m = [1, 0, 0, 1, 0, 0];
+  const st = [];
+  const STROKE = new Set([OPS.stroke, OPS.closeStroke, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
+  const FILL = new Set([OPS.fill, OPS.eoFill]);
+  const IMG = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject, OPS.paintImageXObjectRepeat].filter((x) => x != null));
+  const { fnArray: fn, argsArray: args } = ops;
+  for (let i = 0; i < fn.length; i++) {
+    const f = fn[i], a = args[i];
+    if (f === OPS.save) st.push(m);
+    else if (f === OPS.restore) m = st.pop() || m;
+    else if (f === OPS.transform) m = mul(m, a);
+    else if (f === OPS.paintFormXObjectBegin) { st.push(m); if (a && a[0]) m = mul(m, a[0]); }
+    else if (f === OPS.paintFormXObjectEnd) m = st.pop() || m;
+    else if (IMG.has(f)) {
+      const p = [apply(m, 0, 0), apply(m, 1, 0), apply(m, 0, 1), apply(m, 1, 1)];
+      const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
+      images += (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+    } else if (f === OPS.constructPath) {
+      const paint = a[0], path = a[1] && a[1][0];
+      const stroke = STROKE.has(paint), fill = FILL.has(paint);
+      if ((!stroke && !fill) || !path || typeof path.length !== 'number') continue;
+      const subs = [];
+      let sub = null;
+      for (let k = 0; k < path.length;) {
+        const op = path[k++];
+        if (op === 0) { sub = { pts: [apply(m, path[k], path[k + 1])], curve: new Set(), closed: false }; subs.push(sub); k += 2; }
+        else if (op === 1) { if (sub) sub.pts.push(apply(m, path[k], path[k + 1])); k += 2; }
+        else if (op === 2) { if (sub) { sub.curve.add(sub.pts.length); sub.pts.push(apply(m, path[k + 4], path[k + 5])); } k += 6; }
+        else if (op === 3) { if (sub) { sub.curve.add(sub.pts.length); sub.pts.push(apply(m, path[k + 2], path[k + 3])); } k += 4; }
+        else if (op === 4) { if (sub) sub.closed = true; }
+        else break;
+      }
+      for (const s of subs) {
+        const xs = s.pts.map((q) => q[0]), ys = s.pts.map((q) => q[1]);
+        const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
+        if (fill && !stroke) {     // 填色的细长方块当线（Excel、Word 导出的边框常这么画）
+          const rect = s.pts.length >= 4 && s.pts.length <= 5 && !s.curve.size &&
+            s.pts.every((q) => (Math.abs(q[0] - bx0) < 0.3 || Math.abs(q[0] - bx1) < 0.3) && (Math.abs(q[1] - by0) < 0.3 || Math.abs(q[1] - by1) < 0.3));
+          if (!rect) continue;
+          if (by1 - by0 <= 2.5 && bx1 - bx0 > by1 - by0) H.push({ y: (by0 + by1) / 2, a: bx0, b: bx1 });
+          else if (bx1 - bx0 <= 2.5 && by1 - by0 > bx1 - bx0) V.push({ x: (bx0 + bx1) / 2, a: by0, b: by1 });
+          continue;
+        }
+        const n = s.pts.length;
+        for (let k = 1; k <= (s.closed ? n : n - 1); k++) {
+          if (k < n && s.curve.has(k)) continue;
+          const p = s.pts[k - 1], q = s.pts[k % n];
+          const dx = Math.abs(p[0] - q[0]), dy = Math.abs(p[1] - q[1]);
+          if (dy <= 0.8 && dx > 1) H.push({ y: (p[1] + q[1]) / 2, a: Math.min(p[0], q[0]), b: Math.max(p[0], q[0]) });
+          else if (dx <= 0.8 && dy > 1) V.push({ x: (p[0] + q[0]) / 2, a: Math.min(p[1], q[1]), b: Math.max(p[1], q[1]) });
+        }
+      }
+    }
+  }
+  return { H: mergeLines(H, 'y'), V: mergeLines(V, 'x'), images };
+}
+
+function mergeLines(L, key) {     // 同一条线上的几段拼起来
+  L.sort((p, q) => p[key] - q[key] || p.a - q.a);
+  const out = [];
+  let grp = [];
+  const flush = () => {
+    grp.sort((p, q) => p.a - q.a);
+    for (const l of grp) {
+      const last = out.length ? out[out.length - 1] : null;
+      if (last && last.g === grp && l.a <= last.b + 1.5) last.b = Math.max(last.b, l.b);
+      else out.push({ [key]: l[key], a: l.a, b: l.b, g: grp });
+    }
+  };
+  for (const l of L) {
+    if (grp.length && Math.abs(l[key] - grp[0][key]) > 1.5) { flush(); grp = []; }
+    grp.push(l);
+  }
+  if (grp.length) flush();
+  for (const o of out) delete o.g;
+  return out;
+}
+
+async function readPage(page, OPS) {
+  const [x0, y0, x1, y1] = page.view;
+  const tc = await page.getTextContent();
+  const items = [];
+  let chars = 0;
+  for (const it of tc.items) {
+    if (typeof it.str !== 'string' || !it.str.trim()) continue;
+    chars += it.str.replace(/\s/g, '').length;
+    const [a, b, c, d, e, f] = it.transform;
+    if (a <= 0 || Math.abs(b) > 0.02 * a) continue;          // 只收横着正写的字：斜水印、竖排不进表
+    const fs = Math.hypot(c, d) || it.height || 10;
+    items.push(...splitWide({ s: it.str, x: e, y: f, w: it.width, fs }));
+  }
+  const g = geometry(await page.getOperatorList(), OPS);
+  const area = (x1 - x0) * (y1 - y0);
+  return { items, H: g.H, V: g.V, chars, scan: chars < 20 && g.images > 0.4 * area,
+    top: y1, bottom: y0, height: y1 - y0, blank: chars === 0 && g.images === 0 };
+}
+
+function splitWide(it) {     // 一串字里夹着两个以上空格：多半是拿空格对齐的几列，拆开
+  const s = it.s;
+  if (!/[ 　]{2,}/.test(s.trim())) return [{ ...it, x1: it.x + it.w }];
+  const units = [...s].map((ch) => (CJK_RE.test(ch) ? 2 : 1));
+  const total = units.reduce((p, q) => p + q, 0) || 1;
+  const uw = it.w / total;
+  const out = [];
+  let pos = 0, cur = '', start = 0, spaces = 0;
+  [...s].forEach((ch, i) => {
+    if (ch === ' ' || ch === '　') { spaces++; }
+    else {
+      if (cur && spaces >= 2) { out.push({ s: cur.trim(), x: it.x + start * uw, x1: it.x + (pos - spaces * 1) * uw, y: it.y, fs: it.fs }); cur = ''; }
+      if (!cur) { start = pos; cur = ''; } else if (spaces) cur += ' ';
+      cur += ch; spaces = 0;
+    }
+    pos += units[i];
+  });
+  if (cur) out.push({ s: cur.trim(), x: it.x + start * uw, x1: it.x + (pos - spaces) * uw, y: it.y, fs: it.fs });
+  return out.map((o) => ({ ...o, w: o.x1 - o.x }));
+}
+
+// ================================================================ 字排成行、行里分段
+const cjkEdge = (a, b) => CJK_RE.test(a.slice(-1)) || CJK_RE.test(b.slice(0, 1));
+function joinText(parts) {    // parts: [{s, x, x1, fs}] 已按 x 排好
+  let out = '', last = null;
+  for (const p of parts) {
+    if (last) {
+      const gap = p.x - last.x1;
+      if (gap > 0.15 * p.fs && !out.endsWith(' ') && !cjkEdge(out, p.s)) out += ' ';
+    }
+    out += p.s;
+    last = p;
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+function toLines(items) {
+  const its = [...items].sort((p, q) => q.y - p.y || p.x - q.x);
+  const lines = [];
+  for (const it of its) {
+    const L = lines.length ? lines[lines.length - 1] : null;
+    if (L && Math.abs(L.y - it.y) <= 0.4 * Math.min(L.fs, it.fs)) { L.items.push(it); L.fs = Math.max(L.fs, it.fs); }
+    else lines.push({ y: it.y, fs: it.fs, items: [it] });
+  }
+  for (const L of lines) {
+    L.items.sort((p, q) => p.x - q.x);
+    L.segs = [];
+    let seg = null;
+    for (const it of L.items) {
+      if (seg && it.x - seg.x1 < 0.75 * Math.max(it.fs, seg.fs)) { seg.parts.push(it); seg.x1 = Math.max(seg.x1, it.x1); seg.fs = Math.max(seg.fs, it.fs); }
+      else { seg = { x0: it.x, x1: it.x1, fs: it.fs, parts: [it] }; L.segs.push(seg); }
+    }
+    for (const sg of L.segs) sg.s = joinText(sg.parts);
+    L.x0 = L.segs[0].x0;
+    L.x1 = Math.max(...L.segs.map((sg) => sg.x1));
+  }
+  return lines;
+}
+
+// ================================================================ 有格线的表（lattice）
+function cluster(vals, tol) {
+  const v = [...vals].sort((p, q) => p - q), out = [];
+  for (const x of v) {
+    if (out.length && x - out[out.length - 1].last <= tol) { const c = out[out.length - 1]; c.sum += x; c.n++; c.last = x; }
+    else out.push({ sum: x, n: 1, last: x });
+  }
+  return out.map((c) => c.sum / c.n);
+}
+function gridTables(pg) {
+  const { H, V } = pg, tol = 2.5;
+  const n = H.length + V.length, parent = [...Array(n).keys()];
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < H.length; i++) {
+    const h = H[i];
+    for (let j = 0; j < V.length; j++) {
+      const v = V[j];
+      if (v.x >= h.a - tol && v.x <= h.b + tol && h.y >= v.a - tol && h.y <= v.b + tol) parent[find(i)] = find(H.length + j);
+    }
+  }
+  const comps = new Map();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    if (!comps.has(r)) comps.set(r, { hs: [], vs: [] });
+    if (i < H.length) comps.get(r).hs.push(H[i]); else comps.get(r).vs.push(V[i - H.length]);
+  }
+  const tables = [];
+  const claimed = new Set();
+  for (const { hs, vs } of comps.values()) {
+    if (hs.length < 2 || vs.length < 2) continue;
+    const xs = cluster(vs.map((v) => v.x), 2.5);
+    const ys = cluster(hs.map((h) => h.y), 2.5).reverse();      // 从上往下
+    const minX = Math.min(...hs.map((h) => h.a)), maxX = Math.max(...hs.map((h) => h.b));
+    const minY = Math.min(...vs.map((v) => v.a)), maxY = Math.max(...vs.map((v) => v.b));
+    if (minX < xs[0] - 4) xs.unshift(minX);                        // 左右没竖边框：拿横线的头尾当边
+    if (maxX > xs[xs.length - 1] + 4) xs.push(maxX);
+    if (maxY > ys[0] + 4) ys.unshift(maxY);
+    if (minY < ys[ys.length - 1] - 4) ys.push(minY);
+    const nc = xs.length - 1, nr = ys.length - 1;
+    if (nc < 2 || nr < 2) continue;
+    const cover = (lines, key, at, lo, hi) => {
+      let s = 0;
+      for (const l of lines) if (Math.abs(l[key] - at) <= 2) s += Math.max(0, Math.min(hi, l.b) - Math.max(lo, l.a));
+      return s;
+    };
+    const id = (r, c) => r * nc + c;
+    const par = [...Array(nr * nc).keys()];
+    const fd = (i) => (par[i] === i ? i : (par[i] = fd(par[i])));
+    for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
+      if (c < nc - 1 && cover(vs, 'x', xs[c + 1], ys[r + 1], ys[r]) < 0.5 * (ys[r] - ys[r + 1])) par[fd(id(r, c + 1))] = fd(id(r, c));
+      if (r < nr - 1 && cover(hs, 'y', ys[r + 1], xs[c], xs[c + 1]) < 0.5 * (xs[c + 1] - xs[c])) par[fd(id(r + 1, c))] = fd(id(r, c));
+    }
+    const groups = new Map();
+    for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
+      const g = fd(id(r, c));
+      if (!groups.has(g)) groups.set(g, { r0: r, c0: c, r1: r, c1: c, parts: [] });
+      const G = groups.get(g);
+      G.r0 = Math.min(G.r0, r); G.c0 = Math.min(G.c0, c); G.r1 = Math.max(G.r1, r); G.c1 = Math.max(G.c1, c);
+    }
+    if (groups.size < 2) continue;                                    // 一个大框框住一段字：不是表
+    const inX = (x) => x >= xs[0] - 2 && x <= xs[nc] + 2, inY = (y) => y <= ys[0] + 2 && y >= ys[nr] - 2;
+    const mine = [];
+    for (const it of pg.items) {
+      const cx = (it.x + it.x1) / 2, cy = it.y + it.fs * 0.3;
+      if (!inX(cx) || !inY(cy) || claimed.has(it)) continue;
+      let c = 0; while (c < nc - 1 && cx > xs[c + 1]) c++;
+      let r = 0; while (r < nr - 1 && cy < ys[r + 1]) r++;
+      groups.get(fd(id(r, c))).parts.push(it);
+      mine.push(it);
+    }
+    if (!mine.length) continue;
+    mine.forEach((it) => claimed.add(it));
+    let cells = Array.from({ length: nr }, () => Array(nc).fill(null));
+    let merges = [];
+    for (const G of groups.values()) {
+      if (G.parts.length) cells[G.r0][G.c0] = cellText(G.parts);
+      if (G.r1 > G.r0 || G.c1 > G.c0) merges.push([G.r0, G.c0, G.r1, G.c1]);
+    }
+    // 整行空的扔掉（不在纵向合并里的）
+    const keep = [];
+    for (let r = 0; r < nr; r++) {
+      const empty = cells[r].every((v) => v == null);
+      const inMerge = merges.some((mg) => mg[0] < r && r <= mg[2]) || merges.some((mg) => mg[0] === r && mg[2] > r);
+      if (!empty || inMerge) keep.push(r);
+    }
+    const remap = new Map(keep.map((r, i) => [r, i]));
+    cells = keep.map((r) => cells[r]);
+    merges = merges.filter((mg) => remap.has(mg[0]) && remap.has(mg[2])).map((mg) => [remap.get(mg[0]), mg[1], remap.get(mg[2]), mg[3]]);
+    tables.push(finishTable({ kind: 'grid', cells, merges, top: ys[0], bottom: ys[nr], ncols: nc, cols: xs.slice(0, -1).map((x, i) => [x, xs[i + 1]]) }));
+  }
+  return { tables, claimed };
+}
+function cellText(parts) {
+  const lines = toLines(parts);
+  let out = '';
+  for (const L of lines) {
+    const t = L.segs.map((s) => s.s).join(' ');
+    out += out && !cjkEdge(out, t) ? ' ' + t : t;
+  }
+  return out;
+}
+
+// 表头几行：从上往下，没有数字（年份不算）的行都是表头；纵向合并跨下去的也算
+function headerCount(cells, merges) {
+  const rowNum = (row) => row.some((v) => v != null && numish(v) && !isYear(v));
+  let k = 0;
+  while (k < cells.length && !rowNum(cells[k])) k++;
+  if (k === cells.length) k = cells.length > 1 ? 1 : 0;    // 一个数字都没有：第一行当表头
+  let grow = true;
+  while (grow) {
+    grow = false;
+    for (const m of merges) if (m[0] < k && m[2] >= k && m[2] < cells.length - 1) { k = m[2] + 1; grow = true; }
+  }
+  return k;
+}
+function finishTable(t) {
+  t.headerRows = headerCount(t.cells, t.merges);
+  t.flags = new Map();
+  return t;
+}
+
+// ================================================================ 没格线的表（stream）：靠字的位置对齐
+function place(seg, cols) {
+  const ov = [];
+  cols.forEach((c, i) => { const o = Math.min(c[1], seg.x1) - Math.max(c[0], seg.x0); if (o > 0.5) ov.push(i); });
+  if (ov.length) return [ov[0], ov[ov.length - 1]];
+  const mid = (seg.x0 + seg.x1) / 2;
+  let best = 0, bd = Infinity;
+  cols.forEach((c, i) => { const d = mid < c[0] ? c[0] - mid : mid > c[1] ? mid - c[1] : 0; if (d < bd) { bd = d; best = i; } });
+  return [best, best];
+}
+function streamTables(lines) {
+  const runs = [];
+  let cur = null;
+  const gapOk = (a, b, run) => {
+    const g = a.y - b.y;
+    let lim = 3.2 * Math.max(a.fs, b.fs);
+    if (run && run.gaps.length >= 2) { const s = [...run.gaps].sort((p, q) => p - q); lim = Math.max(lim, 1.5 * s[s.length >> 1]); }
+    return g > 0 && g <= lim;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const L = lines[i], prev = lines[i - 1], next = lines[i + 1];
+    if (L.segs.length >= 2) {
+      if (cur && cur.lines[cur.lines.length - 1] === prev && gapOk(prev, L, cur)) { cur.gaps.push(prev.y - L.y); cur.lines.push(L); }
+      else { cur = { lines: [L], gaps: [] }; runs.push(cur); }
+    } else if (cur && cur.lines[cur.lines.length - 1] === prev && next && next.segs.length >= 2 && gapOk(prev, L, cur) && gapOk(L, next, cur)
+               && (L.x1 - L.x0) < 0.5 * Math.max(prev.x1 - prev.x0, next.x1 - next.x0)) {
+      cur.lines.push(L);          // 夹在两行中间的单格行：合并表头的竖格、折行的格子
+    } else cur = null;
+  }
+  const out = [];
+  for (const run of runs) {
+    if (run.lines.filter((L) => L.segs.length >= 2).length < 2) continue;
+    const t = buildStream(run.lines);
+    if (t) out.push(t);
+  }
+  return out;
+}
+function buildStream(lines) {
+  const dataLine = (L) => L.segs.some((s) => numish(s.s) && !isYear(s.s));
+  let k = lines.findIndex(dataLine);
+  if (k < 0) k = 1;
+  const band = lines.slice(0, k), body = lines.slice(k);
+  const multi = body.filter((L) => L.segs.length >= 2);
+  if (!multi.length) return null;
+  const iv = multi.flatMap((L) => L.segs.map((s) => [s.x0, s.x1])).sort((p, q) => p[0] - q[0]);
+  const cols = [];
+  for (const [a, b] of iv) {
+    if (cols.length && a <= cols[cols.length - 1][1] + 0.5) cols[cols.length - 1][1] = Math.max(cols[cols.length - 1][1], b);
+    else cols.push([a, b]);
+  }
+  const nc = cols.length;
+  if (nc < 2) return null;
+  // 表身
+  const rows = [], flags = [];
+  const pitches = [];
+  for (let i = 1; i < body.length; i++) pitches.push(body[i - 1].y - body[i].y);
+  const pitch = pitches.length ? [...pitches].sort((p, q) => p - q)[pitches.length >> 1] : 0;
+  body.forEach((L, i) => {
+    const row = Array(nc).fill(null);
+    const span = [];
+    for (const s of L.segs) {
+      const [a, b] = place(s, cols);
+      row[a] = row[a] == null ? s.s : row[a] + ' ' + s.s;
+      if (b > a) span.push(a);
+    }
+    const filled = row.filter((v) => v != null).length;
+    const prevRow = rows[rows.length - 1];
+    if (i > 0 && prevRow && !dataLine(L) && filled <= Math.max(1, nc / 2 - 1) && pitch && (body[i - 1].y - L.y) < 0.75 * pitch) {
+      row.forEach((v, c) => { if (v != null) prevRow.cells[c] = prevRow.cells[c] == null ? v : prevRow.cells[c] + (cjkEdge(prevRow.cells[c], v) ? '' : ' ') + v; });
+      return;                 // 折行：接到上一行
+    }
+    rows.push({ cells: row, span });
+  });
+  // 表头
+  const { hcells, hmerges } = streamHeader(band, cols);
+  const cells = hcells.concat(rows.map((r) => r.cells));
+  const t = finishTable({ kind: 'stream', cells, merges: hmerges, top: lines[0].y + lines[0].fs, bottom: lines[lines.length - 1].y - 0.3 * lines[lines.length - 1].fs, ncols: nc, cols });
+  t.headerRows = hcells.length;
+  rows.forEach((r, i) => r.span.forEach((c) => t.flags.set(`${hcells.length + i},${c}`, { why: '这格的字跨到了隔壁列，分列可能不对', color: 'y' })));
+  return t;
+}
+function streamHeader(band, cols) {
+  if (!band.length) return { hcells: [], hmerges: [] };
+  const nc = cols.length;
+  let H = band.map((L) => L.segs.map((s) => ({ s: s.s, x0: s.x0, x1: s.x1, span: place(s, cols) })));
+  // 「夹心行」：它占的列别的表头行都空着 → 它是竖着合并的格子（文字居中，落在两行中间）
+  const uses = (row, c) => row.some((h) => h.span[0] <= c && c <= h.span[1]);
+  let mids = [];
+  if (H.length >= 2) {
+    const isMid = (i) => H[i].every((h) => { for (let c = h.span[0]; c <= h.span[1]; c++) if (H.some((r, j) => j !== i && uses(r, c))) return false; return true; });
+    const midIdx = H.map((_, i) => i).filter(isMid);
+    if (midIdx.length < H.length) { mids = midIdx.flatMap((i) => H[i]); H = H.filter((_, i) => !midIdx.includes(i)); }
+  }
+  const K = H.length;
+  const edgeL = (c) => (c === 0 ? cols[0][0] : (cols[c - 1][1] + cols[c][0]) / 2);
+  const edgeR = (c) => (c === nc - 1 ? cols[nc - 1][1] : (cols[c][1] + cols[c + 1][0]) / 2);
+  const centerOf = (a, b) => (edgeL(a) + edgeR(b)) / 2;
+  // 上层的格子往两边撑：下面几行有字、本行空着、撑开后更居中，就撑
+  for (let r = 0; r < K - 1; r++) {
+    const row = H[r];
+    for (const h of row) {
+      const mid = (h.x0 + h.x1) / 2;
+      const free = (c) => !row.some((o) => o !== h && o.span[0] <= c && c <= o.span[1]) && H.slice(r + 1).some((rr) => uses(rr, c));
+      let moved = true;
+      while (moved) {
+        moved = false;
+        const now = Math.abs(mid - centerOf(h.span[0], h.span[1]));
+        if (h.span[0] > 0 && free(h.span[0] - 1) && Math.abs(mid - centerOf(h.span[0] - 1, h.span[1])) < now - 0.5) { h.span[0]--; moved = true; continue; }
+        if (h.span[1] < nc - 1 && free(h.span[1] + 1) && Math.abs(mid - centerOf(h.span[0], h.span[1] + 1)) < now - 0.5) { h.span[1]++; moved = true; }
+      }
+    }
+  }
+  const hcells = Array.from({ length: K }, () => Array(nc).fill(null));
+  const hmerges = [];
+  const put = (r, h, r1) => {
+    const [a, b] = h.span;
+    hcells[r][a] = hcells[r][a] == null ? h.s : hcells[r][a] + ' ' + h.s;
+    if (b > a || r1 > r) hmerges.push([r, a, r1, b]);
+  };
+  for (const h of mids) put(0, h, K - 1);
+  H.forEach((row, r) => row.forEach((h) => {
+    // 下面几行在这几列都空着：竖着合并到底
+    let r1 = r;
+    while (r1 + 1 < K && !uses(H[r1 + 1], h.span[0]) && ![...Array(h.span[1] - h.span[0] + 1).keys()].some((d) => uses(H[r1 + 1], h.span[0] + d))) r1++;
+    put(r, h, r1);
+  }));
+  return { hcells, hmerges };
+}
+
+// ================================================================ 一页的表、跨页接上
+function pageTables(pg) {
+  const { tables: grids, claimed } = gridTables(pg);
+  const rest = pg.items.filter((it) => !claimed.has(it));
+  const lines = toLines(rest);
+  const streams = streamTables(lines);
+  const all = [...grids, ...streams].sort((p, q) => q.top - p.top);
+  // 不在表里的行：判断表是不是贴着页底 / 页顶，找表的标题
+  const free = lines.filter((L) => !all.some((t) => L.y <= t.top + 0.5 && L.y >= t.bottom - 0.5));
+  for (const t of all) {
+    t.page = pg.no;
+    const above = free.filter((L) => L.y > t.top && L.y - t.top < 40).sort((p, q) => p.y - q.y)[0];
+    t.caption = above ? above.segs.map((s) => s.s).join(' ') : '';
+  }
+  pg.free = free;
+  return all;
+}
+function sameHeader(a, b) {
+  if (a.headerRows !== b.headerRows) return false;
+  const norm = (v) => half(v ?? '').replace(/\s/g, '');
+  for (let r = 0; r < a.headerRows; r++) for (let c = 0; c < a.ncols; c++) if (norm(a.cells[r][c]) !== norm(b.cells[r][c])) return false;
+  return true;
+}
+function joinPages(pages) {
+  const out = [];
+  let prev = null, prevPg = null;
+  for (const pg of pages) {
+    const ts = pg.tables || [];
+    ts.forEach((t, i) => {
+      let joined = false;
+      if (i === 0 && prev && prevPg && prevPg.no === pg.no - 1) {
+        const lowOK = !(prevPg.free || []).some((L) => L.y < prev.bottom && L.y > prevPg.bottom + 0.1 * prevPg.height);
+        const topOK = !(pg.free || []).some((L) => L.y > t.top && L.y < pg.top - 0.12 * pg.height);
+        if (lowOK && topOK) joined = tryJoin(prev, t);
+      }
+      if (!joined) { t.pages = [t.page]; out.push(t); prev = t; }
+    });
+    if (ts.length) {
+      const last = ts[ts.length - 1];
+      prev = out.includes(last) ? last : prev;
+    } else prev = null;
+    prevPg = pg;
+  }
+  return out;
+}
+function tryJoin(prev, t) {
+  if (t.ncols !== prev.ncols) return false;          // 列数不一样不接（某页整列空着的情况留给精加工）
+  let skip;
+  if (t.headerRows === 0) skip = 0;
+  else if (sameHeader(prev, t)) skip = t.headerRows;      // 每页重印的表头：只留第一页的
+  else return false;
+  const base = prev.cells.length;
+  for (let r = skip; r < t.cells.length; r++) prev.cells.push(t.cells[r]);
+  for (const m of t.merges) if (m[0] >= skip) prev.merges.push([m[0] - skip + base, m[1], m[2] - skip + base, m[3]]);
+  for (const [k, v] of t.flags) { const [r, c] = k.split(',').map(Number); if (r >= skip) prev.flags.set(`${r - skip + base},${c}`, v); }
+  if (!prev.pages.includes(t.page)) prev.pages.push(t.page);
+  prev.bottom = t.bottom;
+  prev.page = t.page;
+  return true;
+}
+
+// ================================================================ 定每格的类型（整张表接好以后再定：编号列要看整列）
+function typeTable(t) {
+  const H = t.headerRows;
+  t.typed = t.cells.map((row, r) => row.map((v) => (r < H ? (v == null ? null : { t: 's', v: String(v) }) : parseCell(v))));
+  for (let c = 0; c < t.ncols; c++) {
+    let codes = 0, bad = false;
+    for (let r = H; r < t.cells.length; r++) {
+      const x = t.typed[r][c];
+      if (!x) continue;
+      if (x.code) codes++;
+      else if (x.t === 'n' && !/^\d+$/.test(half(t.cells[r][c]).trim())) bad = true;
+      else if (x.t === 'd') bad = true;
+    }
+    if (codes && !bad) {        // 有 0 开头的编号、别的都是纯数字：整列都是编号，一律照字存
+      for (let r = H; r < t.cells.length; r++) {
+        const x = t.typed[r][c];
+        if (x && x.t === 'n') t.typed[r][c] = { t: 's', v: String(t.cells[r][c]).trim(), code: true };
+      }
+    }
+  }
+  for (let r = H; r < t.cells.length; r++) for (let c = 0; c < t.ncols; c++) {
+    const x = t.typed[r][c];
+    if (x && x.warn && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: x.warn, color: 'y' });
+  }
+  t.bodyRows = t.cells.length - H;
+}
+
+// ================================================================ Gemini：只给扫描页用（钥匙、报错、额度的做法照录入僧）
+class ApiError extends Error {
+  constructor(status, message, detail = '') { super(message); this.status = status; this.detail = detail; }
+  raw() { return this.status ? `HTTP ${this.status}：${this.message}` : this.message; }
+}
+class Fatal extends Error {}
+class Stopped extends Error {}
+function nthSunday(year, month, n) { const d = new Date(Date.UTC(year, month - 1, 1)); return Date.UTC(year, month - 1, 1 + (7 - d.getUTCDay()) % 7 + (n - 1) * 7); }
+function pacificOffsetHours(ms) {
+  const y = new Date(ms).getUTCFullYear();
+  return ms >= nthSunday(y, 3, 2) + 10 * 3600e3 && ms < nthSunday(y, 11, 1) + 9 * 3600e3 ? -7 : -8;
+}
+function nextPacificMidnight(now) {
+  const off = pacificOffsetHours(now), local = new Date(now + off * 3600e3);
+  const mid = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1);
+  return mid - pacificOffsetHours(mid - off * 3600e3) * 3600e3 + 30e3;
+}
+class Keys {
+  constructor(keys) { this.keys = keys.map((k) => (k || '').trim()).filter(Boolean); this.dead = this.keys.map(() => 0); this.used = this.keys.map(() => 0); }
+  pick() { const now = Date.now(); for (let i = 0; i < this.keys.length; i++) if (this.dead[i] <= now) return [i, this.keys[i]]; return [null, Math.min(...this.dead)]; }
+  park(i, until) { this.dead[i] = Math.max(this.dead[i], until); }
+}
+const PROMPT = `你是表格录入员。把这页图片里的每一张表格原样抄出来，交给程序转成 Excel。
+- 每张表一个对象：header 是表头（可能有好几行，每行一个数组），rows 是表身（每行一个数组）。同一张表每行的格数要一样，跟表头列数一致。
+- 合并单元格：字写在左上角那格，被合并掉的格子写空串。
+- 照抄印出来的字：千分位逗号、小数位数、负号、括号负数 (12)、百分号、日期写法都跟原样一模一样，不换算、不补零、不去零。以 0 开头的编号保留开头的 0。
+- 空格子写空串。看不清的字写 □，不要猜。
+- 这页的表要是没印表头（接着上一页的表），header 写空数组 []。
+- 表格外面的标题、正文、页码都不要。这页没有表格就返回 {"tables": []}。`;
+const SCHEMA = { type: 'OBJECT', properties: { tables: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+  header: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } },
+  rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } } }, required: ['header', 'rows'] } } }, required: ['tables'] };
+function genConfig(model, schema) {
+  const gen = { responseMimeType: 'application/json' };
+  if (schema) gen.responseSchema = SCHEMA;
+  if (/^gemini-[12]\./.test(model)) gen.temperature = 0.1;          // Gemini 3 起不发采样参数
+  if (/^gemini-2\.5-flash(?!-lite)/.test(model)) gen.thinkingConfig = { thinkingBudget: 0 };
+  return gen;
+}
+function buildBody(b64, model, schema) {
+  return { systemInstruction: { parts: [{ text: PROMPT }] },
+    contents: [{ role: 'user', parts: [{ text: '把这页里的表格逐张抄出来。' }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
+    generationConfig: genConfig(model, schema) };
+}
+async function callApi(model, key, body, signal) {
+  // 钥匙只走 URL 参数 ?key=。报错原样带回 HTTP 状态码和谷歌的 error.message
+  const url = `${API_BASE.replace(/\/$/, '')}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(new Error('timeout')), TIMEOUT * 1000);
+  const onAbort = () => ctl.abort(signal.reason);
+  if (signal) signal.addEventListener('abort', onAbort, { once: true });
+  let res, raw;
+  try {
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+    raw = await res.text();
+  } catch (e) {
+    if (signal && signal.aborted) throw new Stopped('stopped');
+    throw new ApiError(0, `网络错误：${ctl.signal.aborted ? `等了 ${TIMEOUT} 秒没回音` : (e && e.message) || String(e)}`);
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', onAbort);
+  }
+  if (!res.ok) {
+    let msg = raw.slice(0, 500) || res.statusText || '', detail = '';
+    try { const err = JSON.parse(raw).error || {}; msg = err.message || msg; detail = JSON.stringify(err.details || ''); } catch (e) { /* 原样 */ }
+    throw new ApiError(res.status, msg, detail);
+  }
+  try { return JSON.parse(raw); } catch (e) { throw new ApiError(0, '返回的不是 JSON：' + raw.slice(0, 300)); }
+}
+function parseTables(data) {
+  const parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+  const text = parts.map((p) => p.text || '').join('').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+  if (!text) {
+    const why = ((data.candidates || [])[0] || {}).finishReason || (data.promptFeedback || {}).blockReason || '空的';
+    throw new ApiError(0, `模型没回内容：${why}`);
+  }
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) { throw new ApiError(0, '模型回的不是 JSON：' + text.slice(0, 300)); }
+  const tables = Array.isArray(obj) ? obj : obj.tables;
+  if (!Array.isArray(tables)) throw new ApiError(0, '模型回的 JSON 里没有 tables：' + text.slice(0, 300));
+  const rowsOf = (x) => (Array.isArray(x) ? x : []).filter(Array.isArray).map((r) => r.map((v) => (v == null ? '' : String(v))));
+  return tables.map((t) => ({ header: rowsOf(t && t.header), rows: rowsOf(t && t.rows) }));
+}
+const retryDelay = (d) => { const m = String(d || '').match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/); return m ? parseFloat(m[1]) : null; };
+function classify429(e) { const s = `${e.message} ${e.detail}`; if (/prepay/i.test(s)) return 'prepay'; if (/PerDay|per day|daily/i.test(s)) return 'day'; return 'minute'; }
+const two = (n) => String(n).padStart(2, '0');
+const when = (ms) => { const d = new Date(ms); return `${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`; };
+
+class Engine {
+  constructor(keys, model, say) {
+    this.keys = new Keys(keys); this.model = model; this.say = say;
+    this.useSchema = true; this.fatal = ''; this.requests = 0; this.halt = new AbortController();
+  }
+  stop() { this.halt.abort(); }
+  get stopped() { return this.halt.signal.aborted; }
+  wait(seconds) { return this.sleep(seconds * 1000 * SPEED); }
+  async sleep(ms) {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      if (this.stopped) throw new Stopped('stopped');
+      await new Promise((ok) => { const t = setTimeout(ok, Math.min(30000, Math.max(0, end - Date.now()))); this.halt.signal.addEventListener('abort', () => { clearTimeout(t); ok(); }, { once: true }); });
+    }
+    if (this.stopped) throw new Stopped('stopped');
+  }
+  async read(b64, name) {
+    let minuteHits = 0, netTries = 0;
+    for (;;) {
+      if (this.stopped) throw this.fatal ? new Fatal(this.fatal) : new Stopped('stopped');
+      const [i, key] = this.keys.pick();
+      if (i === null) {
+        const secs = Math.max(0, (key - Date.now()) / 1000);
+        this.say(secs > 120 ? `所有钥匙今天的额度都用完了，等到 ${when(key)} 刷新后接着干（这个页面别关）` : `每分钟次数到顶，等 ${Math.ceil(secs)} 秒`);
+        await this.sleep(Math.max(0, key - Date.now()));
+        continue;
+      }
+      try {
+        this.requests++;
+        const data = await callApi(this.model, key, buildBody(b64, this.model, this.useSchema), this.halt.signal);
+        this.keys.used[i]++;
+        return parseTables(data);
+      } catch (e) {
+        if (!(e instanceof ApiError)) throw e;
+        if (e.status === 429) {
+          const kind = classify429(e);
+          if (kind === 'prepay') throw new Fatal(`钥匙${i + 1} · ${e.raw()}`);
+          if (kind === 'day') { const now = Date.now(); this.keys.park(i, now + (nextPacificMidnight(now) - now) * SPEED); this.say(`钥匙${i + 1} 今天的额度用完了 · ${e.raw()}`); }
+          else {
+            if (++minuteHits > MAX_MINUTE_WAITS) throw e;
+            const d = retryDelay(e.detail);
+            const w = d === null ? MINUTE_WAIT : Math.min(MINUTE_WAIT, Math.max(3, d + 1));
+            this.keys.park(i, Date.now() + w * 1000 * SPEED);
+            this.say(`钥匙${i + 1} 每分钟次数到顶 · ${e.raw()}`);
+          }
+          continue;
+        }
+        if (e.status === 400 && /schema/i.test(e.message) && this.useSchema) { this.useSchema = false; this.say(`模型不认结构化输出，改用纯 JSON 提示 · ${e.raw()}`); continue; }
+        if ([400, 401, 403].includes(e.status) && /API key|API_KEY|permission|PERMISSION/.test(`${e.message} ${e.detail}`)) throw new Fatal(`钥匙${i + 1} · ${e.raw()}`);
+        if (e.status === 404) throw new Fatal(`${this.model} · ${e.raw()}`);
+        if (e.status === 0 || e.status >= 500) {
+          if (netTries < RETRY_WAITS.length) {
+            const w = RETRY_WAITS[netTries++];
+            this.say(`${name} · ${e.raw()} · ${w} 秒后重试`);
+            await this.wait(w);
+            continue;
+          }
+        }
+        throw e;
+      }
+    }
+  }
+}
+
+const normCell = (v) => half(v ?? '').replace(/\s+/g, '').replace(/，/g, ',');
+const shapeOf = (tables) => tables.map((t) => `${t.header.length}x${t.rows.length}x${Math.max(0, ...t.header.concat(t.rows).map((r) => r.length))}`).join('|');
+function sameRead(a, b) {
+  if (shapeOf(a) !== shapeOf(b)) return false;
+  return a.every((t, i) => t.header.concat(t.rows).every((row, r) => row.every((v, c) => normCell(v) === normCell((b[i].header.concat(b[i].rows)[r] || [])[c]))));
+}
+// 几遍的结果投票：同形状的几遍逐格比，过半的算数；没过半的标红。形状都对不上就用第一遍、整张标黄
+function vote(reads) {
+  const shapes = reads.map(shapeOf);
+  const count = new Map();
+  shapes.forEach((s) => count.set(s, (count.get(s) || 0) + 1));
+  let best = shapes[0];
+  for (const [s, n] of count) if (n > count.get(best)) best = s;
+  const same = reads.filter((_, i) => shapes[i] === best);
+  return same[0].map((t, ti) => {
+    const all = (rd) => rd[ti].header.concat(rd[ti].rows);
+    const grid = all(same[0]);
+    const nc = Math.max(1, ...grid.map((r) => r.length));
+    const cells = grid.map((row, r) => Array.from({ length: nc }, (_, c) => {
+      const vals = same.map((rd) => (all(rd)[r] || [])[c] ?? '');
+      return vals;
+    }));
+    const flags = new Map();
+    const out = cells.map((row, r) => row.map((vals, c) => {
+      const tally = new Map();
+      vals.forEach((v) => { const k = normCell(v); tally.set(k, (tally.get(k) || 0) + 1); });
+      let top = normCell(vals[0]);
+      for (const [k, n] of tally) if (n > tally.get(top)) top = k;
+      const winner = vals.find((v) => normCell(v) === top);
+      if (same.length >= 2 && tally.get(top) * 2 <= vals.length) flags.set(`${r},${c}`, { why: `认了 ${vals.length} 遍不一样：${vals.map((v) => v || '（空）').join(' / ')}`, color: 'r' });
+      else if (same.length < 2 && reads.length > 1) flags.set(`${r},${c}`, { why: '几遍认出来的表格形状对不上，这张表整张都得看一眼', color: 'y' });
+      else if (/□/.test(winner)) flags.set(`${r},${c}`, { why: '有看不清的字（□）', color: 'r' });
+      return winner === '' ? null : winner;
+    }));
+    return { header: t.header.length, cells: out, flags, ncols: nc };
+  });
+}
+
+function canvasJpeg(canvas) {
+  return new Promise((ok, bad) => canvas.toBlob((b) => {
+    if (!b) return bad(new Error('图片没生成出来'));
+    const fr = new FileReader();
+    fr.onload = () => ok(String(fr.result).split(',')[1]);
+    fr.onerror = () => bad(fr.error);
+    fr.readAsDataURL(b);
+  }, 'image/jpeg', JPEG_Q));
+}
+async function renderPage(page, enhance) {
+  const vp0 = page.getViewport({ scale: 1 });
+  const scale = Math.min(4, MAX_SIDE / Math.max(vp0.width, vp0.height));
+  const vp = page.getViewport({ scale });
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  const ctx = cv.getContext('2d', { willReadFrequently: enhance });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  await page.render({ canvasContext: ctx, canvas: cv, viewport: vp }).promise;
+  if (enhance) {           // 第二遍用灰度、拉过对比度的图：两遍看到的东西不完全一样，对答案才有意义
+    const im = ctx.getImageData(0, 0, cv.width, cv.height), d = im.data, hist = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; d[i] = g; hist[g]++; }
+    const n = d.length / 4;
+    let lo = 0, hi = 255, acc = 0;
+    while (lo < 255 && (acc += hist[lo]) < n * 0.01) lo++;
+    acc = 0;
+    while (hi > 0 && (acc += hist[hi]) < n * 0.05) hi--;
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, (d[i] - lo) * 255 / span)); d[i] = d[i + 1] = d[i + 2] = v; }
+    ctx.putImageData(im, 0, 0);
+  }
+  const b64 = await canvasJpeg(cv);
+  cv.width = cv.height = 0;
+  return b64;
+}
+async function readScan(doc, pg, eng) {
+  const page = await doc.getPage(pg.no);
+  const name = `第 ${pg.no} 页`;
+  const plain = await renderPage(page, false);
+  const reads = [await eng.read(plain, name), await eng.read(await renderPage(page, true), name)];
+  if (!sameRead(reads[0], reads[1])) reads.push(await eng.read(plain, name));
+  page.cleanup();
+  return vote(reads).map((v) => {
+    const t = { kind: 'scan', cells: v.cells, merges: [], ncols: v.ncols, top: pg.top, bottom: pg.bottom, page: pg.no, caption: '' };
+    t.headerRows = v.header;
+    t.flags = v.flags;
+    return t;
+  });
+}
+
+// ================================================================ 写 Excel
+const FILL = { y: 'FFFFF2CC', r: 'FFFFC7CE' };
+const thin = { style: 'thin', color: { argb: 'FFD1D1D6' } };
+const BORDER = { top: thin, left: thin, bottom: thin, right: thin };
+function colName(c) { let s = ''; c++; while (c) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; } return s; }
+function sheetName(s, used) {
+  let n = String(s).replace(/[\[\]:*?/\\]/g, ' ').slice(0, 31) || '表';
+  let k = 2, base = n;
+  while (used.has(n)) n = `${base.slice(0, 27)} (${k++})`;
+  used.add(n);
+  return n;
+}
+function pagesText(ps) {
+  if (!ps.length) return '';
+  const out = [];
+  let a = ps[0], b = ps[0];
+  for (const p of ps.slice(1).concat([null])) {
+    if (p === b + 1) { b = p; continue; }
+    out.push(a === b ? `${a}` : `${a}–${b}`);
+    a = b = p;
+  }
+  return out.join('、');
+}
+async function waitExcelJS() {
+  for (let i = 0; i < 300 && !window.ExcelJS; i++) await new Promise((ok) => setTimeout(ok, 100));
+  if (!window.ExcelJS) throw new Error('Excel 的库没从网上下载下来（cdn.jsdelivr.net），网络好了刷新再试');
+  return window.ExcelJS;
+}
+async function buildWorkbook(job) {
+  const ExcelJS = await waitExcelJS();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = '扒表僧';
+  wb.created = new Date();
+  const used = new Set();
+  job.tables.forEach((t, ti) => {
+    t.sheet = sheetName(`表${ti + 1}`, used);
+    const ws = wb.addWorksheet(t.sheet, t.headerRows ? { views: [{ state: 'frozen', ySplit: t.headerRows, xSplit: 0 }] } : {});
+    const widths = Array(t.ncols).fill(6);
+    t.typed.forEach((row, r) => {
+      const xr = ws.getRow(r + 1);
+      for (let c = 0; c < t.ncols; c++) {
+        const x = row[c], cell = xr.getCell(c + 1);
+        if (x) {
+          if (x.t === 'n') { cell.value = x.v; if (x.fmt) cell.numFmt = x.fmt; }
+          else if (x.t === 'd') { cell.value = new Date(Date.UTC(x.v[0], x.v[1] - 1, x.v[2])); cell.numFmt = x.fmt; }
+          else { cell.value = x.v; if (x.code) cell.numFmt = '@'; }
+          const shown = t.cells[r][c] == null ? '' : String(t.cells[r][c]);
+          if (!t.merges.some((m) => m[1] <= c && c <= m[3] && m[3] > m[1] && m[0] <= r && r <= m[2])) widths[c] = Math.max(widths[c], Math.min(60, dwidth(shown) + 2));
+        }
+        cell.border = BORDER;
+        if (r < t.headerRows) {
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F7' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        }
+        const f = t.flags.get(`${r},${c}`);
+        if (f) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[f.color] } }; cell.note = f.why; }
+      }
+    });
+    for (const m of t.merges) { try { ws.mergeCells(m[0] + 1, m[1] + 1, m[2] + 1, m[3] + 1); } catch (e) { /* 重叠的合并跳过 */ } }
+    widths.forEach((w, c) => { ws.getColumn(c + 1).width = w; });
+  });
+  // 最后一张：扒表记录
+  const ws = wb.addWorksheet(sheetName('扒表记录', used));
+  const add = (vals, bold) => { const r = ws.addRow(vals); if (bold) r.font = { bold: true }; return r; };
+  add([job.name], true);
+  add([`共 ${job.pages} 页，扒出 ${job.tables.length} 张表。${new Date().toLocaleString('zh-CN')}`]);
+  add([]);
+  add(['表', '在第几页', '行（不算表头）', '列', '表上方那行字', '要看一眼的格子'], true);
+  for (const t of job.tables) add([t.sheet, pagesText(t.pages), t.bodyRows, t.ncols, t.caption || '', t.flags.size || '']);
+  const flagged = job.tables.flatMap((t) => [...t.flags].map(([k, f]) => { const [r, c] = k.split(',').map(Number); return [t.sheet, `${colName(c)}${r + 1}`, t.cells[r][c] ?? '', f.why]; }));
+  if (flagged.length) {
+    add([]);
+    add(['要看一眼的格子（表里同样标了颜色，鼠标放上去能看原因）'], true);
+    add(['表', '格子', '扒到的字', '为什么'], true);
+    flagged.slice(0, 5000).forEach((v) => add(v));
+  }
+  if (job.issues.length) {
+    add([]);
+    add(['没扒成的页'], true);
+    job.issues.forEach(([p, why]) => add([`第 ${p} 页`, why]));
+  }
+  if (job.fulltext) {
+    add([]);
+    add(['没找到表，正文按行放在下面'], true);
+    job.fulltext.forEach((row) => add(row));
+  }
+  [12, 14, 16, 8, 40, 60].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+// ================================================================ 页面
+let pdfjs = null;
+async function lib() {
+  if (!pdfjs) {
+    try { pdfjs = await import(PDFJS + 'legacy/build/pdf.min.mjs'); }
+    catch (e) { throw new Error('读 PDF 的库没从网上下载下来（cdn.jsdelivr.net），网络好了刷新再试'); }
+    pdfjs.GlobalWorkerOptions.workerSrc = PDFJS + 'legacy/build/pdf.worker.min.mjs';
+  }
+  return pdfjs;
+}
+const store = {
+  get keys() { try { return JSON.parse(localStorage.getItem('pabiao.keys') || '[]'); } catch (e) { return []; } },
+  set keys(v) { localStorage.setItem('pabiao.keys', JSON.stringify(v)); },
+  get model() { return localStorage.getItem('pabiao.model') || DEFAULT_MODEL; },
+  set model(v) { localStorage.setItem('pabiao.model', v); },
+};
+function show(id) {
+  for (const s of ['s-idle', 's-work', 's-done']) $('#' + s).hidden = s !== id;
+  T.phase = id.slice(2);
+}
+function say(msg) { $('#w-status').textContent = msg; T.log.push(msg); }
+function bar(frac) { $('#w-bar').style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`; }
+
+let job = null;     // 当前这份：{file, name, doc, pages, tables, blob, ...}
+
+async function start(file) {
+  if (!file) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { job = null; finish({ error: `「${file.name}」不是 PDF。贫僧只吃 PDF。` }); return; }
+  job = { file, name: file.name.replace(/\.pdf$/i, ''), issues: [] };
+  T.result = null;
+  $('#w-name').textContent = file.name;
+  $('#w-meta').textContent = `${(file.size / 1048576).toFixed(file.size < 1048576 ? 2 : 1)} MB`;
+  $('#preview').hidden = true;
+  show('s-work'); bar(0); say('');
+  try {
+    const L = await lib();
+    say('打开 PDF…');
+    const data = new Uint8Array(await file.arrayBuffer());
+    try {
+      job.doc = await L.getDocument({ data, cMapUrl: PDFJS + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS + 'standard_fonts/',
+        wasmUrl: PDFJS + 'wasm/', iccUrl: PDFJS + 'iccs/', isEvalSupported: false }).promise;
+    } catch (e) {
+      if (e && e.name === 'PasswordException') throw new Error('这份 PDF 上了密码锁，贫僧撬不开。先用别的软件去掉密码再丢进来。');
+      throw new Error(`这份 PDF 打不开：${e && e.message || e}`);
+    }
+    const N = job.doc.numPages;
+    $('#w-meta').textContent += ` · ${N} 页`;
+    job.pages = [];
+    for (let p = 1; p <= N; p++) {
+      const page = await job.doc.getPage(p);
+      const pg = await readPage(page, L.OPS);
+      pg.no = p;
+      if (!pg.scan && !pg.blank) pg.tables = pageTables(pg);
+      else pg.free = [];
+      delete pg.items; delete pg.H; delete pg.V;
+      job.pages.push(pg);
+      page.cleanup();
+      say(`第 ${p} / ${N} 页`);
+      bar(p / N * (job.pages.some((x) => x.scan) ? 0.4 : 0.92));
+      if (p % 2 === 0 || N < 20) await tick();
+    }
+    await scans();
+  } catch (e) {
+    finish({ error: e.message || String(e) });
+  }
+}
+
+async function scans() {
+  const todo = job.pages.filter((p) => p.scan && !p.tables);
+  const keys = store.keys.filter(Boolean);
+  if (todo.length && keys.length) {
+    const eng = new Engine(keys, store.model, say);
+    job.engine = eng;
+    let done = 0;
+    say(`扫描件 ${todo.length} 页，借谷歌的眼睛看，每页认两遍对答案`);
+    const queue = [...todo];
+    const worker = async () => {
+      while (queue.length && !eng.stopped) {
+        const pg = queue.shift();
+        try {
+          pg.tables = await readScan(job.doc, pg, eng);
+          pg.error = '';
+        } catch (e) {
+          if (e instanceof Fatal) { eng.fatal = eng.fatal || e.message; eng.stop(); }
+          if (e instanceof Stopped || e instanceof Fatal) return;
+          pg.error = e instanceof ApiError ? e.raw() : `${e.name || 'Error'}：${e.message}`;
+          pg.tables = null;
+        }
+        done++;
+        say(`扫描件 ${done} / ${todo.length} 页`);
+        bar(0.4 + 0.52 * done / todo.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(SCAN_AT_ONCE, todo.length) }, worker));
+    if (eng.fatal) job.fatal = eng.fatal;
+  }
+  await wrapUp();
+}
+
+async function wrapUp() {
+  const pages = job.pages;
+  job.issues = [];
+  for (const p of pages) {
+    if (p.scan && !p.tables) job.issues.push([p.no, p.error ? `扫描件，谷歌没认成：${p.error}` : (job.fatal ? `扫描件，没认：${job.fatal}` : '扫描件，没钥匙，没认')]);
+  }
+  // 每次重新接一遍（补认了扫描页以后要重排）
+  const fresh = pages.map((p) => ({ ...p, tables: (p.tables || []).map((t) => ({ ...t, cells: t.cells.map((r) => [...r]), merges: t.merges.map((m) => [...m]), flags: new Map(t.flags) })) }));
+  job.tables = joinPages(fresh);
+  job.tables.forEach(typeTable);
+  job.pagesN = pages.length;
+  const scanLeft = pages.filter((p) => p.scan && !p.tables);
+  job.fulltext = null;
+  if (!job.tables.length && !scanLeft.length && !job.fatal) {
+    // 一张表都没有：正文按行放进 Excel，别吐空表
+    job.fulltext = [];
+    for (let p = 1; p <= job.doc.numPages; p++) {
+      const page = await job.doc.getPage(p);
+      const pg = await readPage(page, (await lib()).OPS);
+      for (const L of toLines(pg.items)) job.fulltext.push(L.segs.map((s) => s.s));
+      page.cleanup();
+    }
+  }
+  say('写 Excel…');
+  bar(0.96);
+  let blob = null;
+  if (job.tables.length || job.fulltext) {
+    blob = await buildWorkbook({ name: job.file.name, pages: pages.length, tables: job.tables, issues: job.issues, fulltext: job.fulltext && job.fulltext.length ? job.fulltext : null });
+    job.blob = blob;
+    download();
+  }
+  bar(1);
+  finish({ scanLeft });
+}
+
+function download() {
+  if (!job || !job.blob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(job.blob);
+  a.download = `${job.name}.xlsx`;
+  document.body.append(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+  T.downloads = (T.downloads || 0) + 1;
+}
+
+function finish({ error = '', scanLeft = [] }) {
+  show('s-done');
+  const flags = job && job.tables ? job.tables.reduce((n, t) => n + t.flags.size, 0) : 0;
+  const red = job && job.tables ? job.tables.reduce((n, t) => n + [...t.flags.values()].filter((f) => f.color === 'r').length, 0) : 0;
+  const rows = job && job.tables ? job.tables.reduce((n, t) => n + t.bodyRows, 0) : 0;
+  const nt = job && job.tables ? job.tables.length : 0;
+  const ok = !error && (nt > 0 || (job && job.fulltext));
+  $('#d-ok').style.display = ok ? '' : 'none';      // 没干完不打勾
+  $('#d-save').hidden = !(job && job.blob);
+  $('#d-err').hidden = true;
+  $('#d-key').hidden = true;
+  $('#d-line2').hidden = true;
+  const l2 = (s) => { $('#d-line2').textContent = s; $('#d-line2').hidden = !s; };
+  if (error) {
+    $('#d-title').textContent = '这份没扒成';
+    $('#d-line').textContent = '';
+    $('#d-err').textContent = error;
+    $('#d-err').hidden = false;
+  } else if (nt) {
+    $('#d-title').textContent = `扒出 ${nt} 张表，${rows.toLocaleString()} 行`;
+    $('#d-line').textContent = flags ? `${flags} 格拿不准，表里标${red && red < flags ? '了红、黄' : red ? '红' : '黄'}了。Excel 已经下载。干完你核对就好了。` : 'Excel 已经下载。干完你核对就好了。';
+  } else if (job && job.fulltext) {
+    $('#d-title').textContent = '翻遍了，没找到表';
+    $('#d-line').textContent = job.fulltext.length ? '正文按行放进 Excel 了，凑合看。' : '这份 PDF 里一个字都没有。';
+    if (!job.fulltext.length) $('#d-save').hidden = true;
+  } else {
+    $('#d-title').textContent = scanLeft.length === (job.pages || []).length ? '这份是扫描件' : '有字的页里没找到表';
+    $('#d-line').textContent = '';
+  }
+  if (!error && scanLeft.length) {
+    const which = pagesText(scanLeft.map((p) => p.no));
+    if (job.fatal) {
+      $('#d-err').textContent = job.fatal;
+      $('#d-err').hidden = false;
+      if (/HTTP 404/.test(job.fatal)) l2(`第 ${which} 页是扫描件。模型名不对，点右上角 ⚙ 换个模型，再丢一次。下面是谷歌原话。`);
+      else { l2(`第 ${which} 页是扫描件，谷歌那边出了岔子，下面是谷歌原话。`); showKey(which, true); }
+    } else if (!store.keys.filter(Boolean).length) {
+      showKey(which, false);
+      if (nt) l2(`第 ${which} 页是扫描件，还没认。`);
+    } else {
+      const errs = scanLeft.filter((p) => p.error);
+      l2(`第 ${which} 页没认成，原因写在 Excel 的「扒表记录」里。`);
+      if (errs.length) { $('#d-err').textContent = errs.map((p) => `第 ${p.no} 页：${p.error}`).join('\n'); $('#d-err').hidden = false; }
+    }
+  }
+  renderPreview();
+  T.phase = 'done';
+  T.result = { error, tables: nt, rows, flags, red, scanLeft: scanLeft.map((p) => p.no), fatal: job && job.fatal || '', title: $('#d-title').textContent };
+}
+function showKey(which, retry) {
+  $('#d-key').hidden = false;
+  $('#d-keywhy').textContent = retry
+    ? '换一把钥匙贴进来，贫僧接着认。'
+    : `第 ${which} 页是拍的或扫的，没有字可抠。贫僧肉眼凡胎，得借谷歌的眼睛看，贴一把钥匙就接着干。`;
+  $('#d-keyin').value = '';
+}
+
+function renderPreview() {
+  const box = $('#pv');
+  box.textContent = '';
+  if (!job || !job.tables || !job.tables.length) { $('#preview').hidden = true; return; }
+  $('#preview').hidden = false;
+  const anyFlag = job.tables.some((t) => t.flags.size);
+  $('#pv-note').hidden = !anyFlag;
+  const MAXT = 12, MAXR = 6;
+  job.tables.slice(0, MAXT).forEach((t) => {
+    const card = document.createElement('div');
+    card.className = 'tcard';
+    const tt = document.createElement('div');
+    tt.className = 'tt';
+    const b = document.createElement('b'); b.textContent = t.sheet;
+    const s = document.createElement('span'); s.textContent = `第 ${pagesText(t.pages)} 页 · ${t.bodyRows} 行 × ${t.ncols} 列${t.caption ? ' · ' + t.caption : ''}`;
+    tt.append(b, s);
+    if (t.flags.size) { const f = document.createElement('span'); f.className = 'flag'; f.textContent = `${t.flags.size} 格要看`; tt.append(f); }
+    const sc = document.createElement('div'); sc.className = 'scroll';
+    const tb = document.createElement('table'); tb.className = 'pv';
+    const covered = new Set();
+    for (const m of t.merges) for (let r = m[0]; r <= m[2]; r++) for (let c = m[1]; c <= m[3]; c++) if (r !== m[0] || c !== m[1]) covered.add(`${r},${c}`);
+    const last = Math.min(t.cells.length, t.headerRows + MAXR);
+    for (let r = 0; r < last; r++) {
+      const tr = document.createElement('tr');
+      for (let c = 0; c < t.ncols; c++) {
+        if (covered.has(`${r},${c}`)) continue;
+        const td = document.createElement(r < t.headerRows ? 'th' : 'td');
+        const m = t.merges.find((mm) => mm[0] === r && mm[1] === c);
+        if (m) { td.colSpan = m[3] - m[1] + 1; td.rowSpan = Math.min(m[2], last - 1) - m[0] + 1; }
+        const x = t.typed[r][c];
+        td.textContent = t.cells[r][c] ?? '';
+        if (x && (x.t === 'n' || x.t === 'd')) td.classList.add('n');
+        const f = t.flags.get(`${r},${c}`);
+        if (f) { td.classList.add(f.color); td.title = f.why; }
+        tr.append(td);
+      }
+      tb.append(tr);
+    }
+    sc.append(tb);
+    card.append(tt, sc);
+    if (t.bodyRows > MAXR) { const mo = document.createElement('div'); mo.className = 'more'; mo.textContent = `…还有 ${(t.bodyRows - MAXR).toLocaleString()} 行，在 Excel 里`; card.append(mo); }
+    box.append(card);
+  });
+  if (job.tables.length > MAXT) { const mo = document.createElement('p'); mo.className = 'more'; mo.textContent = `另外 ${job.tables.length - MAXT} 张表只在 Excel 里。`; box.append(mo); }
+}
+
+// ---------------------------------------------------------------- 按钮、拖放、钥匙
+const pick = $('#pick');
+$('#drop').onclick = () => pick.click();
+$('#drop').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick.click(); } };
+pick.onchange = () => { const f = pick.files[0]; pick.value = ''; start(f); };
+$('#d-again').onclick = () => { show('s-idle'); $('#preview').hidden = true; pick.click(); };
+$('#d-save').onclick = download;
+let dragDepth = 0;
+addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; $('#drop').classList.add('over'); });
+addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('#drop').classList.remove('over'); } });
+addEventListener('dragover', (e) => e.preventDefault());
+addEventListener('drop', (e) => {
+  e.preventDefault(); dragDepth = 0; $('#drop').classList.remove('over');
+  const f = [...(e.dataTransfer.files || [])].find((x) => /\.pdf$/i.test(x.name) || x.type === 'application/pdf') || e.dataTransfer.files[0];
+  if (f && T.phase !== 'work') start(f);
+});
+const looksKey = (v) => /^[A-Za-z0-9_.\-]{30,}$/.test(v.trim());
+async function resumeWithKey(v) {
+  const keys = store.keys;
+  keys[0] = v.trim();
+  store.keys = keys;
+  if (!job || !job.doc) return;
+  job.fatal = '';
+  for (const p of job.pages) if (p.scan && !p.tables) p.error = '';
+  show('s-work'); bar(0.4);
+  try { await scans(); } catch (e) { finish({ error: e.message || String(e) }); }
+}
+$('#d-keyin').addEventListener('input', (e) => { if (looksKey(e.target.value)) resumeWithKey(e.target.value); });
+$('#d-keyin').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) resumeWithKey(e.target.value); });
+
+const dlg = $('#dlg-set');
+$('#model').append(...MODELS.map((m) => new Option(m, m)));
+$('#ver').textContent = `v${VERSION}`;
+$('#gear').onclick = () => {
+  const k = store.keys;
+  $('#k1').value = k[0] || ''; $('#k2').value = k[1] || '';
+  const m = store.model;
+  if (![...$('#model').options].some((o) => o.value === m)) $('#model').append(new Option(m, m));
+  $('#model').value = m;
+  dlg.showModal();
+};
+function saveSettings() { store.keys = [$('#k1').value.trim(), $('#k2').value.trim()]; store.model = $('#model').value; }
+$('#set-ok').onclick = () => { saveSettings(); dlg.close(); };
+dlg.addEventListener('close', saveSettings);
+dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+$('#mail').addEventListener('click', () => { try { navigator.clipboard.writeText('oilsongchengmin@gmail.com'); } catch (e) { /* 复制不了就算了 */ } });
+
+T.ready = true;
+</script>
+</body>
+</html>
