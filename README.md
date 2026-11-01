@@ -27,6 +27,7 @@ PDF 丢进来，Excel 自己下载。扫描件也认得。千手院（QIANSHOU L
 | `tests/dev_ocr.py` | 调本地认字用：只跑扫描件，打印每个错格；`--engine tess` 换成 Tesseract.js 对比，`--debug` 存下收拾过的图和框 |
 | `tests/check_live.py` | 上线后自检：打开线上网址，丢样本进去对答案（含一份扫描件） |
 | `docs/设计记录.md` | 为什么这么做 |
+| `bench/比武报告.md` | 跟 Nanonets、iLovePDF、PDF24 拿 9 份公开真文件对打的结果（施工单 011） |
 
 跑测试：
 
