@@ -18,8 +18,8 @@ URL = sys.argv[1] if len(sys.argv) > 1 else "https://qianshoulab.github.io/pabia
 def main():
     with urllib.request.urlopen(URL, timeout=30) as r:
         html = r.read().decode("utf-8")
-        print("HTTP", r.status, "· 标题在" if "<title>扒表僧" in html else "· 标题不对")
-    ok = "<title>扒表僧" in html
+        print("HTTP", r.status, "· 标题在" if "<title>渡表僧" in html else "· 标题不对")
+    ok = "<title>渡表僧" in html
     for m in ("models/ppocrv5_mobile_det.onnx", "models/ppocrv5_mobile_rec.onnx", "models/ppocrv5_dict.txt"):
         req = urllib.request.Request(URL.rstrip("/") + "/" + m, method="HEAD")
         with urllib.request.urlopen(req, timeout=30) as r:

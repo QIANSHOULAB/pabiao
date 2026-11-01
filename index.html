@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>扒表僧 · 施主丢卷，贫僧扒表</title>
+<title>渡表僧 · 施主丢卷，贫僧扒表</title>
 <meta name="description" content="PDF 丢进来，Excel 自己下载。扫描件也认得。网页版，电脑、手机都能用。">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#F5F5F7">
@@ -159,14 +159,14 @@
 </svg>
 
 <div class="nav"><div class="in">
-  <div class="brand"><svg style="color:var(--green)"><use href="#i-grid"/></svg>扒表僧</div>
+  <div class="brand"><svg style="color:var(--green)"><use href="#i-grid"/></svg>渡表僧</div>
   <div class="sp"></div>
   <button type="button" class="icon-btn" id="gear" aria-label="设置"><svg><use href="#i-gear"/></svg></button>
 </div></div>
 
 <main>
   <div class="hero">
-    <h1>扒表僧</h1>
+    <h1>渡表僧</h1>
     <p class="sub">施主丢卷，贫僧扒表</p>
     <p class="lead">PDF 丢进来，Excel 自己下载。扫描件也认得。</p>
   </div>
@@ -241,7 +241,7 @@
 </div></dialog>
 
 <script type="text/plain" id="ocr-src">
-// 扒表僧 · 本地认字。在 Worker 里跑，不卡页面。模型是 PP-OCRv5 mobile（Apache-2.0）：det 找字在哪，rec 一段段认。
+// 渡表僧 · 本地认字。在 Worker 里跑，不卡页面。模型是 PP-OCRv5 mobile（Apache-2.0）：det 找字在哪，rec 一段段认。
 // 先把图收拾干净：压平阴影 → 扶正 → 找出表格线（交给拼表）并擦掉（免得被认成 1 或 |）。
 let ort = null, det = null, rec = null, dict = null;
 
@@ -755,8 +755,8 @@ self.onmessage = async (e) => {
 </script>
 
 <script type="module">
-// 扒表僧：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
-const VERSION = '0.2.0';
+// 渡表僧（原名扒表僧）：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
+const VERSION = '0.2.1';
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const Q = new URLSearchParams(location.search);
@@ -1813,7 +1813,7 @@ async function waitExcelJS() {
 async function buildWorkbook(job) {
   const ExcelJS = await waitExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = '扒表僧';
+  wb.creator = '渡表僧';
   wb.created = new Date();
   const used = new Set();
   job.tables.forEach((t, ti) => {
