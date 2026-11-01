@@ -756,7 +756,7 @@ self.onmessage = async (e) => {
 
 <script type="module">
 // 渡表僧（原名扒表僧）：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
-const VERSION = '0.2.2';
+const VERSION = '0.2.3';
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const Q = new URLSearchParams(location.search);
@@ -784,6 +784,7 @@ function numFmt(body, paren, prefix) {
   const grp = body.includes(',');
   let f = (grp ? '#,##0' : '0') + (dec ? '.' + '0'.repeat(dec) : '');
   if (prefix) f = `"${prefix}"${f}`;
+  if (paren === 'signed') return `"("${f}")";"(-"${f}")"`;
   if (paren) return `${f};(${f})`;
   if (!grp && !dec && !prefix) return null;
   return f;
@@ -808,7 +809,8 @@ function parseCell(raw) {
   }
   let neg = false, paren = false, pct = false, prefix = '';
   if (/^\(.*\)$/.test(s)) { paren = true; neg = true; s = s.slice(1, -1).trim(); }
-  if (/^[-+]/.test(s)) { neg = neg !== (s[0] === '-'); if (s[0] === '-' && paren) return weird(shown); s = s.slice(1).trim(); }
+  if (paren && /^[-+]\d/.test(s)) { neg = s[0] === '-'; paren = 'signed'; s = s.slice(1); }      // 「(-4.7)」：统计表里给增减率加的括号
+  else if (/^[-+]/.test(s)) { neg = neg !== (s[0] === '-'); if (s[0] === '-' && paren) return weird(shown); s = s.slice(1).trim(); }
   const cur = s.match(/^([¥$€£])\s?/);
   if (cur) { prefix = cur[1]; s = s.slice(cur[0].length); }
   if (s.endsWith('%')) { pct = true; s = s.slice(0, -1).trim(); }
@@ -837,6 +839,7 @@ const apply = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[
 function geometry(ops, OPS) {
   const H = [], V = [];
   let images = 0, m = [1, 0, 0, 1, 0, 0];
+  const imgs = [];
   const st = [];
   const STROKE = new Set([OPS.stroke, OPS.closeStroke, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
   const FILL = new Set([OPS.fill, OPS.eoFill]);
@@ -853,6 +856,7 @@ function geometry(ops, OPS) {
       const p = [apply(m, 0, 0), apply(m, 1, 0), apply(m, 0, 1), apply(m, 1, 1)];
       const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
       images += (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+      imgs.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
     } else if (f === OPS.constructPath) {
       const paint = a[0], path = a[1] && a[1][0];
       const stroke = STROKE.has(paint), fill = FILL.has(paint);
@@ -890,7 +894,7 @@ function geometry(ops, OPS) {
       }
     }
   }
-  return { H: mergeLines(H, 'y'), V: mergeLines(V, 'x'), images };
+  return { H: mergeLines(H, 'y'), V: mergeLines(V, 'x'), images, imgs };
 }
 
 function mergeLines(L, key) {     // 同一条线上的几段拼起来
@@ -920,7 +924,9 @@ async function readPage(page, OPS) {
   const items = [];
   let chars = 0;
   for (const it of tc.items) {
-    if (typeof it.str !== 'string' || !it.str.trim()) continue;
+    if (typeof it.str !== 'string') continue;
+    it.str = it.str.replace(/[\u0000-\u001f\u007f]/g, '');       // 有的 PDF 字里夹着控制字符
+    if (!it.str.trim()) continue;
     chars += it.str.replace(/\s/g, '').length;
     const [a, b, c, d, e, f] = it.transform;
     if (a <= 0 || Math.abs(b) > 0.02 * a) continue;          // 只收横着正写的字：斜水印、竖排不进表
@@ -929,7 +935,10 @@ async function readPage(page, OPS) {
   }
   const g = geometry(await page.getOperatorList(), OPS);
   const area = (x1 - x0) * (y1 - y0);
-  return { items, H: g.H, V: g.V, chars, scan: chars < 20 && g.images > 0.4 * area,
+  // 有字的页上一张没压字的大图（说明书里截了张发票、报告里贴了张表的截图）：里面可能有表
+  const pics = g.imgs.filter(([a, b, c, d]) => (c - a) * (d - b) > 0.15 * area
+    && items.filter((it) => (it.x + it.x1) / 2 > a && (it.x + it.x1) / 2 < c && it.y > b && it.y < d).length < 5);
+  return { items, H: g.H, V: g.V, chars, pics, scan: chars < 20 && g.images > 0.4 * area,
     top: y1, bottom: y0, height: y1 - y0, blank: chars === 0 && g.images === 0 };
 }
 
@@ -1070,9 +1079,10 @@ function gridTables(pg) {
       if (G.parts.length) { cells[G.r0][G.c0] = cellText(G.parts); src.set(`${G.r0},${G.c0}`, G.parts); }
       if (G.r1 > G.r0 || G.c1 > G.c0) merges.push([G.r0, G.c0, G.r1, G.c1]);
     }
+    ({ cells, merges } = splitBands({ cells, merges, src, groups, fd, id, nr, nc, xs }));
     // 整行空的扔掉（不在纵向合并里的）
     const keep = [];
-    for (let r = 0; r < nr; r++) {
+    for (let r = 0; r < cells.length; r++) {
       const empty = cells[r].every((v) => v == null);
       const inMerge = merges.some((mg) => mg[0] < r && r <= mg[2]) || merges.some((mg) => mg[0] === r && mg[2] > r);
       if (!empty || inMerge) keep.push(r);
@@ -1082,9 +1092,81 @@ function gridTables(pg) {
     merges = merges.filter((mg) => remap.has(mg[0]) && remap.has(mg[2])).map((mg) => [remap.get(mg[0]), mg[1], remap.get(mg[2]), mg[3]]);
     const src2 = new Map();
     for (const [k, v] of src) { const [r, c] = k.split(',').map(Number); if (remap.has(r)) src2.set(`${remap.get(r)},${c}`, v); }
-    tables.push(finishTable({ kind: 'grid', cells, merges, src: src2, top: ys[0], bottom: ys[nr], ncols: nc, cols: xs.slice(0, -1).map((x, i) => [x, xs[i + 1]]) }));
+    // 整列空着的扔掉（多画了一根细竖线，凭空切出一列）；相邻两列每行最多一边有字（表头在左、数在右），并成一列
+    let cols = xs.slice(0, -1).map((x, i) => [x, xs[i + 1]]);
+    for (let c = nc - 2; c >= 0; c--) {
+      const a = cells.filter((row) => row[c] != null).length, b = cells.filter((row) => row[c + 1] != null).length;
+      if (!a || !b || cells.some((row) => row[c] != null && row[c + 1] != null)) continue;
+      cells.forEach((row, r) => { if (row[c] == null) { row[c] = row[c + 1]; if (src2.has(`${r},${c + 1}`)) src2.set(`${r},${c}`, src2.get(`${r},${c + 1}`)); } row[c + 1] = null; src2.delete(`${r},${c + 1}`); });
+    }
+    const live = [...Array(nc).keys()].filter((c) => cells.some((row) => row[c] != null));
+    if (live.length >= 2 && live.length < nc) {
+      const newC = new Map(live.map((c, i) => [c, i]));
+      const near = (c, dir) => { while (!newC.has(c)) c += dir; return newC.get(c); };
+      cells = cells.map((row) => live.map((c) => row[c]));
+      merges = merges.filter((m) => live.some((c) => c >= m[1] && c <= m[3]))
+        .map((m) => [m[0], near(m[1], 1), m[2], near(m[3], -1)]).filter((m) => m[2] > m[0] || m[3] > m[1]);
+      const moved = [...src2].map(([k, v]) => { const [r, c] = k.split(',').map(Number); return [r, c, v]; });
+      src2.clear();
+      for (const [r, c, v] of moved) if (newC.has(c)) src2.set(`${r},${newC.get(c)}`, v);
+      cols = live.map((c) => [xs[c], xs[c + 1]]);
+    }
+    tables.push(finishTable({ kind: 'grid', cells, merges, src: src2, top: ys[0], bottom: ys[nr], ncols: cols.length, cols }));
   }
   return { tables, claimed };
+}
+// 只有竖线、表身没横线（年报的资产负债表、老统计年鉴）：一个格子里叠着几十行数。
+// 被纵向合并连在一起的几行算一块；一块里至少两列各有两行以上的数，就整块按字的行切开，块里的合并作废
+// （横线只画了半截，左右两半被当成了合并格）。行距明显小的、没有数的行是折行，接回上一行。
+function splitBands({ cells, merges, src, groups, fd, id, nr, nc, xs }) {
+  const colOf = (it) => { const cx = (it.x + it.x1) / 2; let c = 0; while (c < nc - 1 && cx > xs[c + 1]) c++; return c; };
+  const numLine = (L) => L.segs.some((s) => numish(s.s) && !isYear(s.s));
+  const out = [], outSrc = new Map(), at = [], dead = new Set();
+  let split = false;
+  for (let r = 0; r < nr;) {
+    let rb = r, grow = true;
+    while (grow) { grow = false; for (const m of merges) if (m[0] >= r && m[0] <= rb && m[2] > rb) { rb = m[2]; grow = true; } }
+    const seen = new Set(), items = [];
+    for (let rr = r; rr <= rb; rr++) for (let c = 0; c < nc; c++) { const g = fd(id(rr, c)); if (!seen.has(g)) { seen.add(g); items.push(...groups.get(g).parts); } }
+    const lines = toLines(items);
+    const numRows = Array(nc).fill(0);
+    for (const L of lines) for (let c = 0; c < nc; c++) if (L.items.some((it) => colOf(it) === c && numish(it.s) && !isYear(it.s))) numRows[c]++;
+    let sub = null;
+    const numLines = lines.filter(numLine).length;
+    if (lines.length >= 3 && numLines > rb - r + 1 && numRows.filter((n) => n >= 2).length >= 2) {
+      const gaps = [];
+      for (let i = 1; i < lines.length; i++) gaps.push(lines[i - 1].y - lines[i].y);
+      const pitch = [...gaps].sort((p, q) => p - q)[gaps.length >> 1];
+      sub = [];
+      lines.forEach((L, i) => {
+        const parts = Array.from({ length: nc }, () => []);
+        for (const it of L.items) parts[colOf(it)].push(it);
+        const prev = sub[sub.length - 1];
+        if (prev && !numLine(L) && lines[i - 1].y - L.y < 0.75 * pitch) { parts.forEach((q, c) => prev[c].push(...q)); return; }
+        sub.push(parts);
+      });
+    }
+    if (!sub) {
+      for (let rr = r; rr <= rb; rr++) {
+        at[rr] = out.length;
+        out.push(cells[rr]);
+        for (let c = 0; c < nc; c++) if (src.has(`${rr},${c}`)) outSrc.set(`${out.length - 1},${c}`, src.get(`${rr},${c}`));
+      }
+    } else {
+      split = true;
+      for (let rr = r; rr <= rb; rr++) at[rr] = out.length;
+      merges.forEach((m, i) => { if (m[0] >= r && m[2] <= rb) dead.add(i); });
+      for (const parts of sub) {
+        out.push(parts.map((q) => (q.length ? cellText(q) : null)));
+        parts.forEach((q, c) => { if (q.length) outSrc.set(`${out.length - 1},${c}`, q); });
+      }
+    }
+    r = rb + 1;
+  }
+  if (!split) return { cells, merges };
+  src.clear();
+  for (const [k, v] of outSrc) src.set(k, v);
+  return { cells: out, merges: merges.filter((_, i) => !dead.has(i)).map((m) => [at[m[0]], m[1], at[m[2]], m[3]]) };
 }
 function cellText(parts) {
   const lines = toLines(parts);
@@ -1126,21 +1208,27 @@ function place(seg, cols) {
   cols.forEach((c, i) => { const d = mid < c[0] ? c[0] - mid : mid > c[1] ? mid - c[1] : 0; if (d < bd) { bd = d; best = i; } });
   return [best, best];
 }
-function streamTables(lines, minRows = 2) {
+function streamTables(lines, minRows = 2, pgOcr = false) {
   const runs = [];
   let cur = null;
-  const gapOk = (a, b, run) => {
+  const gapOk = (a, b, run, c) => {
     const g = a.y - b.y;
     let lim = 3.2 * Math.max(a.fs, b.fs);
     if (run && run.gaps.length >= 2) { const s = [...run.gaps].sort((p, q) => p - q); lim = Math.max(lim, 1.5 * s[s.length >> 1]); }
-    return g > 0 && g <= lim;
+    if (g > 0 && g <= lim) return true;
+    // 排得稀的老表：两行都分成 3 段以上，行距不超过 5 倍字号，跟上一个或下一个行距差不多
+    const near = (h) => h > 0 && Math.abs(h - g) <= 0.25 * g;
+    return g > 0 && g <= 5 * Math.max(a.fs, b.fs) && a.segs.length >= 3 && b.segs.length >= 3
+      && ((c && c.segs.length >= 3 && near(b.y - c.y)) || (run && run.gaps.length && near(run.gaps[run.gaps.length - 1])));
   };
+  // 字号差一截的不接（表下面紧挨着的小字注释，一段就横跨整张表，会把列全并掉）：跟这段里最大的字号比
+  const fsOk = (run, L) => { const big = Math.max(...run.lines.map((x) => x.fs)); return Math.abs(big - L.fs) <= 0.25 * Math.max(big, L.fs); };
   for (let i = 0; i < lines.length; i++) {
     const L = lines[i], prev = lines[i - 1], next = lines[i + 1];
     if (L.segs.length >= 2) {
-      if (cur && cur.lines[cur.lines.length - 1] === prev && gapOk(prev, L, cur)) { cur.gaps.push(prev.y - L.y); cur.lines.push(L); }
+      if (cur && cur.lines[cur.lines.length - 1] === prev && gapOk(prev, L, cur, next) && fsOk(cur, L)) { cur.gaps.push(prev.y - L.y); cur.lines.push(L); }
       else { cur = { lines: [L], gaps: [] }; runs.push(cur); }
-    } else if (cur && cur.lines[cur.lines.length - 1] === prev && next && next.segs.length >= 2 && gapOk(prev, L, cur) && gapOk(L, next, cur)
+    } else if (cur && cur.lines[cur.lines.length - 1] === prev && next && next.segs.length >= 2 && gapOk(prev, L, cur) && gapOk(L, next, cur) && fsOk(cur, L) && fsOk(cur, next)
                && (L.x1 - L.x0) < 0.5 * Math.max(prev.x1 - prev.x0, next.x1 - next.x0)) {
       cur.lines.push(L);          // 夹在两行中间的单格行：合并表头的竖格、折行的格子
     } else cur = null;
@@ -1148,6 +1236,9 @@ function streamTables(lines, minRows = 2) {
   const out = [];
   for (const run of runs) {
     if (run.lines.filter((L) => L.segs.length >= 2).length < minRows) continue;
+    // 至少两行带数（年份不算）：「4.5 按行業主類劃分…」这种编号加标题不是表
+    const big = Math.max(...run.lines.map((L) => L.fs));
+    if (!pgOcr && run.lines.filter((L) => L.fs >= 0.8 * big && L.segs.some((g) => numish(g.s) && !isYear(g.s))).length < 2) continue;
     const t = buildStream(run.lines);
     if (t) out.push(t);
   }
@@ -1184,12 +1275,16 @@ function buildStream(lines) {
     }
     const filled = row.filter((v) => v != null).length;
     const prevRow = rows[rows.length - 1];
-    if (i > 0 && prevRow && !dataLine(L) && filled <= Math.max(1, nc / 2 - 1) && pitch && (body[i - 1].y - L.y) < 0.75 * pitch) {
+    const gap = body[i - 1] ? body[i - 1].y - L.y : 0;
+    // 折行：行距明显小、只占一两格；或者紧跟在带数的行后面、开头是小写字母 / 同时占着两列以上的字（中英对照的行名一起折）
+    const wrap = !dataLine(L) && pitch && ((filled <= Math.max(1, nc / 2 - 1) && gap < 0.75 * pitch)
+      || (gap < 0.95 * pitch && prevRow && prevRow.data && (filled >= 2 || L.segs.some((g) => /^[a-z]/.test(g.s)))));
+    if (i > 0 && prevRow && wrap) {
       row.forEach((v, c) => { if (v != null) prevRow.cells[c] = prevRow.cells[c] == null ? v : prevRow.cells[c] + (cjkEdge(prevRow.cells[c], v) ? '' : ' ') + v; });
       src.forEach((v, c) => { if (v) prevRow.src[c] = (prevRow.src[c] || []).concat(v); });
       return;                 // 折行：接到上一行
     }
-    rows.push({ cells: row, span, src });
+    rows.push({ cells: row, span, src, data: dataLine(L) });
   });
   // 表头
   const { hcells, hmerges } = streamHeader(band, cols);
@@ -1253,7 +1348,7 @@ function pageTables(pg) {
   const { tables: grids, claimed } = gridTables(pg);
   const rest = pg.items.filter((it) => !claimed.has(it));
   const lines = toLines(rest);
-  const streams = streamTables(lines, pg.ocr ? 3 : 2);
+  const streams = streamTables(lines, pg.ocr ? 3 : 2, !!pg.ocr);
   const all = [...grids, ...streams].sort((p, q) => q.top - p.top);
   // 不在表里的行：判断表是不是贴着页底 / 页顶，找表的标题
   const free = lines.filter((L) => !all.some((t) => L.y <= t.top + 0.5 && L.y >= t.bottom - 0.5));
@@ -1629,13 +1724,15 @@ function ocrReady() {
   return OCR.ready;
 }
 
-async function ocrRender(doc, no) {
+async function ocrRender(doc, no, rect) {      // rect：只认这一块（PDF 坐标，y 朝上），放大了认
   const page = await doc.getPage(no);
   const vp0 = page.getViewport({ scale: 1 });
-  const s = Math.min(4, OCR_SIDE / Math.max(vp0.width, vp0.height));
-  const vp = page.getViewport({ scale: s });
+  const [vx0, , , vy1] = vp0.viewBox;
+  const bw = rect ? rect[2] - rect[0] : vp0.width, bh = rect ? rect[3] - rect[1] : vp0.height;
+  const s = Math.min(rect ? 8 : 4, OCR_SIDE / Math.max(bw, bh));
+  const vp = rect ? page.getViewport({ scale: s, offsetX: -(rect[0] - vx0) * s, offsetY: -(vy1 - rect[3]) * s }) : page.getViewport({ scale: s });
   const cv = document.createElement('canvas');
-  cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  cv.width = Math.round(rect ? bw * s : vp.width); cv.height = Math.round(rect ? bh * s : vp.height);
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
   await page.render({ canvasContext: ctx, canvas: cv, viewport: vp }).promise;
@@ -1667,9 +1764,9 @@ async function tessWords(r) {            // 只在本机比较用：同一张收
 }
 
 // 认一页扫描件：字和格线换算成跟文字层一样的坐标（点，y 朝上），交给同一套拼表
-async function readLocal(doc, pg) {
+async function readLocal(doc, pg, rect) {
   await ocrReady();
-  const img = await ocrRender(doc, pg.no);
+  const img = await ocrRender(doc, pg.no, rect);
   const t0 = performance.now();
   let r;
   if (OCR_ENGINE === 'tess') {
@@ -1692,23 +1789,56 @@ async function readLocal(doc, pg) {
     for (const v of r.V) { ctx.beginPath(); ctx.moveTo(v.x0, v.y0); ctx.lineTo(v.x1, v.y1); ctx.stroke(); }
     (T.ocrImgs = T.ocrImgs || []).push(cv.toDataURL('image/png'));
   }
-  const { W, H, s } = img, Hpt = H / s;
+  const { W, H, s } = img, Hpt = rect ? rect[3] : H / s, ox = rect ? rect[0] : 0;
   const sizes = r.words.map((w) => w.gh / s).sort((p, q) => p - q), mid = sizes.length ? sizes[sizes.length >> 1] : 10;
   const items = r.words.map((w) => {
     const fs = Math.min(2.5 * mid, Math.max(0.7 * mid, w.gh / s * OCR_FS)), cy = Hpt - (w.cy != null ? w.cy : (w.y0 + w.y1) / 2) / s;
-    return { s: w.s, x: w.x0 / s, x1: w.x1 / s, w: (w.x1 - w.x0) / s, y: cy - 0.3 * fs, fs, p: w.p };
+    return { s: w.s, x: ox + w.x0 / s, x1: ox + w.x1 / s, w: (w.x1 - w.x0) / s, y: cy - 0.3 * fs, fs, p: w.p };
   });
+  splitGlued(items);
   const pp = {
-    no: pg.no, items, ocr: true, top: Hpt, bottom: 0, height: Hpt,
-    H: mergeLines(r.H.map((h) => ({ y: Hpt - (h.y0 + h.y1) / 2 / s, a: h.x0 / s, b: h.x1 / s })), 'y'),
-    V: mergeLines(r.V.map((v) => ({ x: (v.x0 + v.x1) / 2 / s, a: Hpt - v.y1 / s, b: Hpt - v.y0 / s })), 'x'),
+    no: pg.no, items, ocr: true, top: Hpt, bottom: Hpt - H / s, height: H / s,
+    H: mergeLines(r.H.map((h) => ({ y: Hpt - (h.y0 + h.y1) / 2 / s, a: ox + h.x0 / s, b: ox + h.x1 / s })), 'y'),
+    V: mergeLines(r.V.map((v) => ({ x: ox + (v.x0 + v.x1) / 2 / s, a: Hpt - v.y1 / s, b: Hpt - v.y0 / s })), 'x'),
   };
   const tables = pageTables(pp);
   tables.forEach(ocrFix);
-  Object.assign(pg, { top: Hpt, bottom: 0, height: Hpt, free: pp.free, ocrLines: toLines(items).map((L) => L.segs.map((sg) => sg.s)) });
+  Object.assign(pg, { top: Hpt, bottom: pp.bottom, height: pp.height, free: pp.free, ocrLines: toLines(items).map((L) => L.segs.map((sg) => sg.s)) });
   (T.ocr = T.ocr || []).push({ page: pg.no, engine: OCR_ENGINE, ms: Math.round(performance.now() - t0), parts: r.ms, angle: r.angle, quad: !!r.quad, boxes: r.boxes,
     words: r.words.length, lines: [r.H.length, r.V.length], W, H, debug: LOCAL && Q.get('debug') ? r.words : undefined, hv: LOCAL && Q.get('debug') ? { H: r.H, V: r.V } : undefined });
   return tables;
+}
+
+// 认字时挨得近的两个数被框成了一个词（「100」「43」→「10043」）：这个词横跨了别的行都空着的列缝，就从缝那儿劈开
+function splitGlued(items) {
+  const lines = toLines(items.slice());
+  const gaps = [];
+  for (const L of lines) if (L.segs.length >= 3) for (let i = 1; i < L.segs.length; i++) gaps.push([L.segs[i - 1].x1, L.segs[i].x0]);
+  const out = [];
+  for (const it of items) {
+    const t = it.s.replace(/\s/g, '');
+    let done = false;
+    if (/^\d[\d,.]{2,}$/.test(t)) {
+      const pad = 0.3 * (it.x1 - it.x) / t.length;
+      const inside = gaps.filter(([a, b]) => a > it.x + pad && b < it.x1 - pad);
+      let best = null, bn = 0;
+      for (const [a, b] of inside) {
+        const mid = (a + b) / 2, n = gaps.filter(([p, q]) => p < mid && q > mid).length;
+        if (n > bn) { bn = n; best = mid; }
+      }
+      if (best != null && bn >= 3) {
+        const k = Math.max(1, Math.min(t.length - 1, Math.round((best - it.x) / (it.x1 - it.x) * t.length)));
+        const L1 = t.slice(0, k), R1 = t.slice(k);
+        if (numish(L1) && numish(R1)) {
+          const cw = (it.x1 - it.x) / t.length;
+          out.push({ ...it, s: L1, x1: it.x + k * cw, w: k * cw }, { ...it, s: R1, x: it.x + k * cw, w: (t.length - k) * cw });
+          done = true;
+        }
+      }
+    }
+    if (!done) out.push(it);
+  }
+  items.splice(0, items.length, ...out);
 }
 
 // 认完以后：数字列里认成字母的改回数字（标橙），没把握的标黄
@@ -1737,7 +1867,12 @@ function ocrFix(t) {
       }
       if (w !== v) t.cells[r][c] = w;
       if (!t.flags.has(key) && sure < OCR_SURE_NUM) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
-    } else if (sure < OCR_SURE_TEXT) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
+    } else {
+      // 老统计年鉴的行名后面跟一串引导点「Idaho.......」，认出来剩个「Idaho.」「Kansas-」：去掉
+      const bare = v.replace(/[\s.\-_·…‥:：'`]+$/, '');
+      if (!numCol[c] && bare !== v && bare.length >= 2 && /[A-Za-z一-鿿)）]$/.test(bare)) t.cells[r][c] = bare;
+      if (sure < OCR_SURE_TEXT) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
+    }
   }
   // 数字列里别的行都有数、这行别的格也都有字，偏偏这格空着：多半是漏认了
   for (let c = 0; c < t.ncols; c++) {
@@ -1768,6 +1903,24 @@ function ocrFix(t) {
     }
   }
   delete t.src;
+}
+
+// 有字的页里贴着的大图：本地认一遍整页，只收落在图里的表。一份最多认 5 页，年报里一堆照片别拖慢
+async function picScans() {
+  const pages = job.pages.filter((p) => p.pics).slice(0, 5);
+  if (!pages.length) return;
+  try { await ocrReady(); } catch (e) { return; }
+  for (const pg of pages) {
+    say(`第 ${pg.no} 页贴着张图，贫僧看看里面有没有表`);
+    const keep = { top: pg.top, bottom: pg.bottom, height: pg.height, free: pg.free };
+    try {
+      const got = [];
+      for (const r of pg.pics) got.push(...await readLocal(job.doc, pg, r));
+      if (got.length) { pg.tables = (pg.tables || []).concat(got).sort((p, q) => q.top - p.top); pg.picOcr = got.length; }
+    } catch (e) { /* 图里认不出来就算了，有字的部分照样出 */ }
+    Object.assign(pg, keep);
+    delete pg.ocrLines;
+  }
 }
 
 async function localScans(pages, lo) {
@@ -1926,8 +2079,12 @@ async function start(file) {
       const page = await job.doc.getPage(p);
       const pg = await readPage(page, L.OPS);
       pg.no = p;
-      if (!pg.scan && !pg.blank) pg.tables = pageTables(pg);
-      else pg.free = [];
+      if (!pg.scan && !pg.blank) {
+        pg.tables = pageTables(pg);
+        const hit = (r, t) => t.top > r[1] && t.bottom < r[3];
+        pg.pics = pg.pics.filter((r) => !pg.tables.some((t) => hit(r, t)));
+        if (!pg.pics.length) delete pg.pics;
+      } else { pg.free = []; delete pg.pics; }
       delete pg.items; delete pg.H; delete pg.V;
       job.pages.push(pg);
       page.cleanup();
@@ -1975,6 +2132,7 @@ async function scans() {
   }
   const need = scanPages.filter((p) => !p.via);
   if (need.length) await localScans(need, keys.length ? 0.7 : 0.4);
+  await picScans();
   await wrapUp();
 }
 
@@ -1982,6 +2140,7 @@ async function wrapUp() {
   const pages = job.pages;
   job.issues = [];
   for (const p of pages) {      // 扫描页每页怎么认的，写进「扒表记录」
+    if (p.picOcr) job.issues.push([p.no, `这页贴着张图，图里的 ${p.picOcr} 张表是本地认字认的`]);
     if (!p.scan) continue;
     const g = p.error || (p.via !== 'gemini' && job.fatal) || '';
     if (!p.tables) job.issues.push([p.no, `扫描件，没认成：${p.localError || g || '不知道为啥'}`]);

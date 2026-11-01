@@ -2,3 +2,6 @@
 tests/out/
 __pycache__/
 *.pyc
+bench/files/
+bench/raw/
+bench/out/
