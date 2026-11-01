@@ -756,7 +756,7 @@ self.onmessage = async (e) => {
 
 <script type="module">
 // 渡表僧（原名扒表僧）：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
-const VERSION = '0.2.3';
+const VERSION = '0.2.4';
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const Q = new URLSearchParams(location.search);
@@ -990,7 +990,8 @@ function toLines(items) {
     L.segs = [];
     let seg = null;
     for (const it of L.items) {
-      if (seg && it.x - seg.x1 < 0.75 * Math.max(it.fs, seg.fs)) { seg.parts.push(it); seg.x1 = Math.max(seg.x1, it.x1); seg.fs = Math.max(seg.fs, it.fs); }
+      // it.cut：劈开的粘连数，右半截另起一段
+      if (seg && !it.cut && it.x - seg.x1 < 0.75 * Math.max(it.fs, seg.fs)) { seg.parts.push(it); seg.x1 = Math.max(seg.x1, it.x1); seg.fs = Math.max(seg.fs, it.fs); }
       else { seg = { x0: it.x, x1: it.x1, fs: it.fs, parts: [it] }; L.segs.push(seg); }
     }
     for (const sg of L.segs) sg.s = joinText(sg.parts);
@@ -1038,13 +1039,20 @@ function gridTables(pg) {
     if (maxX > xs[xs.length - 1] + 4) xs.push(maxX);
     if (maxY > ys[0] + 4) ys.unshift(maxY);
     if (minY < ys[ys.length - 1] - 4) ys.push(minY);
-    const nc = xs.length - 1, nr = ys.length - 1;
-    if (nc < 2 || nr < 2) continue;
     const cover = (lines, key, at, lo, hi) => {
       let s = 0;
       for (const l of lines) if (Math.abs(l[key] - at) <= 2) s += Math.max(0, Math.min(hi, l.b) - Math.max(lo, l.a));
       return s;
     };
+    // 本地认的老表：竖线只画在表头里。表身下面那几行没有一根里面的竖线穿过，不归格线表（交给按字对齐分列）
+    if (pg.ocr && xs.length > 2) {
+      const covered = (r) => xs.slice(1, -1).some((x) => cover(vs, 'x', x, ys[r + 1], ys[r]) >= 0.5 * (ys[r] - ys[r + 1]));
+      let cut = ys.length - 1;
+      while (cut > 1 && !covered(cut - 1)) cut--;
+      ys.length = cut + 1;
+    }
+    const nc = xs.length - 1, nr = ys.length - 1;
+    if (nc < 2 || nr < 1 || (nr < 2 && !pg.ocr)) continue;
     const id = (r, c) => r * nc + c;
     const par = [...Array(nr * nc).keys()];
     const fd = (i) => (par[i] === i ? i : (par[i] = fd(par[i])));
@@ -1428,6 +1436,10 @@ function typeTable(t) {
   for (let r = H; r < t.cells.length; r++) for (let c = 0; c < t.ncols; c++) {
     const x = t.typed[r][c];
     if (x && x.warn && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: x.warn, color: 'y' });
+    // 一格里挤着三个以上的数：行没切开的样子（比武时 88 格全错还报「扒出 1 张表」，不能再这样）
+    const toks = String(t.cells[r][c] ?? '').trim().split(/\s+/).filter((w) => numish(w));
+    const spaced = /^\d{1,3}( \d{3})+(\.\d+)?$/.test(String(t.cells[r][c] ?? '').trim());
+    if (toks.length >= 3 && !spaced) t.flags.set(`${r},${c}`, { why: `一格里挤着 ${toks.length} 个数，多半是行没切开，对一下原件`, color: 'r' });
   }
   t.bodyRows = t.cells.length - H;
 }
@@ -1814,24 +1826,28 @@ function splitGlued(items) {
   const lines = toLines(items.slice());
   const gaps = [];
   for (const L of lines) if (L.segs.length >= 3) for (let i = 1; i < L.segs.length; i++) gaps.push([L.segs[i - 1].x1, L.segs[i].x0]);
+  // 这页上一个数字有多宽：拿 2～4 位的纯数字词量
+  const ws = items.filter((it) => /^\d{2,4}$/.test(it.s)).map((it) => (it.x1 - it.x) / it.s.length).sort((p, q) => p - q);
+  if (!ws.length) return;
+  const cw = ws[ws.length >> 1];
   const out = [];
   for (const it of items) {
     const t = it.s.replace(/\s/g, '');
     let done = false;
     if (/^\d[\d,.]{2,}$/.test(t)) {
-      const pad = 0.3 * (it.x1 - it.x) / t.length;
-      const inside = gaps.filter(([a, b]) => a > it.x + pad && b < it.x1 - pad);
+      const inside = gaps.filter(([a, b]) => a > it.x + 0.5 * cw && b < it.x1 - 0.5 * cw);
       let best = null, bn = 0;
       for (const [a, b] of inside) {
-        const mid = (a + b) / 2, n = gaps.filter(([p, q]) => p < mid && q > mid).length;
-        if (n > bn) { bn = n; best = mid; }
+        const mid = (a + b) / 2, sup = gaps.filter(([p, q]) => p < mid && q > mid);
+        if (sup.length > bn) { bn = sup.length; best = sup.map(([p]) => p).sort((p, q) => p - q)[sup.length >> 1]; }
       }
       if (best != null && bn >= 3) {
-        const k = Math.max(1, Math.min(t.length - 1, Math.round((best - it.x) / (it.x1 - it.x) * t.length)));
+        // 左边那列的数靠右对齐，到列缝左沿为止：按字宽数出左边有几位
+        const k = Math.max(1, Math.min(t.length - 1, Math.round((best - it.x) / cw)));
         const L1 = t.slice(0, k), R1 = t.slice(k);
         if (numish(L1) && numish(R1)) {
-          const cw = (it.x1 - it.x) / t.length;
-          out.push({ ...it, s: L1, x1: it.x + k * cw, w: k * cw }, { ...it, s: R1, x: it.x + k * cw, w: (t.length - k) * cw });
+          const rx = it.x1 - R1.length * cw;
+          out.push({ ...it, s: L1, x1: it.x + k * cw, w: k * cw }, { ...it, s: R1, x: rx, w: it.x1 - rx, cut: true });
           done = true;
         }
       }
