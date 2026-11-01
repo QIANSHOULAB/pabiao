@@ -756,7 +756,7 @@ self.onmessage = async (e) => {
 
 <script type="module">
 // 渡表僧（原名扒表僧）：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
-const VERSION = '0.2.4';
+const VERSION = '0.2.5';
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const Q = new URLSearchParams(location.search);
@@ -1189,7 +1189,10 @@ function cellText(parts) {
 // 表头几行：从上往下，没有数字（年份不算）的行都是表头；纵向合并跨下去的也算
 function headerCount(cells, merges) {
   const rowNum = (row) => row.some((v) => v != null && numish(v) && !isYear(v));
+  const plain = (row) => row.some((v) => { const c = v == null ? null : parseCell(v); return !!c && (c.t === 'n' || !!c.code) && !isYear(v); });
   let k = 0;
+  // 第一行只有日期和字（「2024 年 12 月 31 日」这种表头），下面三行内有普通数：第一行是表头
+  if (cells.length > 1 && !plain(cells[0]) && rowNum(cells[0]) && cells.slice(1, 4).some(plain)) k = 1;
   while (k < cells.length && !rowNum(cells[k])) k++;
   if (k === cells.length) k = cells.length > 1 ? 1 : 0;    // 一个数字都没有：第一行当表头
   let grow = true;
@@ -1230,12 +1233,29 @@ function streamTables(lines, minRows = 2, pgOcr = false) {
       && ((c && c.segs.length >= 3 && near(b.y - c.y)) || (run && run.gaps.length && near(run.gaps[run.gaps.length - 1])));
   };
   // 字号差一截的不接（表下面紧挨着的小字注释，一段就横跨整张表，会把列全并掉）：跟这段里最大的字号比
+  const numLine = (L) => L.segs.some((g) => numish(g.s) && !isYear(g.s));
+  const over = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 0;
   const fsOk = (run, L) => { const big = Math.max(...run.lines.map((x) => x.fs)); return Math.abs(big - L.fs) <= 0.25 * Math.max(big, L.fs); };
   for (let i = 0; i < lines.length; i++) {
     const L = lines[i], prev = lines[i - 1], next = lines[i + 1];
     if (L.segs.length >= 2) {
-      if (cur && cur.lines[cur.lines.length - 1] === prev && gapOk(prev, L, cur, next) && fsOk(cur, L)) { cur.gaps.push(prev.y - L.y); cur.lines.push(L); }
-      else { cur = { lines: [L], gaps: [] }; runs.push(cur); }
+      // 表头跟第一行数隔得远（表头下面空一大截）：没数的一行、每段都压在下面某一列上，也接上
+      const headOver = cur && cur.lines.length === 1 && prev === cur.lines[0] && !numLine(prev) && numLine(L)
+        && prev.y - L.y <= 4.5 * Math.max(prev.fs, L.fs) && prev.segs.every((a) => L.segs.some((b) => over(a, b)));
+      if (cur && cur.lines[cur.lines.length - 1] === prev && (gapOk(prev, L, cur, next) || headOver) && fsOk(cur, L)) { cur.gaps.push(prev.y - L.y); cur.lines.push(L); }
+      else {
+        cur = { lines: [L], gaps: [] }; runs.push(cur);
+        // 表头折了几行：上面紧贴着、没有数、每段只压在这行某一段上的字，拼进那一段（「RESIDENT / POPULATION / (APRIL 1, 2020)」）
+        if (!numLine(L)) {
+          for (let j = i - 1; j >= 0; j--) {
+            const P = lines[j], below = lines[j + 1];
+            if (numLine(P) || P.y - below.y > 1.6 * Math.max(P.fs, below.fs) || Math.abs(P.fs - L.fs) > 0.15 * L.fs) break;
+            const hits = P.segs.map((a) => L.segs.filter((b) => over(a, b)));
+            if (!hits.every((h) => h.length === 1)) break;
+            P.segs.forEach((a, k) => { const b = hits[k][0]; b.s = a.s + (cjkEdge(a.s, b.s) ? '' : ' ') + b.s; b.x0 = Math.min(b.x0, a.x0); b.x1 = Math.max(b.x1, a.x1); });
+          }
+        }
+      }
     } else if (cur && cur.lines[cur.lines.length - 1] === prev && next && next.segs.length >= 2 && gapOk(prev, L, cur) && gapOk(L, next, cur) && fsOk(cur, L) && fsOk(cur, next)
                && (L.x1 - L.x0) < 0.5 * Math.max(prev.x1 - prev.x0, next.x1 - next.x0)) {
       cur.lines.push(L);          // 夹在两行中间的单格行：合并表头的竖格、折行的格子
