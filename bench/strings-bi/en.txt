@@ -18,7 +18,7 @@ metaPages	 · {n} {n|page|pages}
 pageOf	Page {p} of {n}
 geminiStart	{n} scanned {n|page|pages}. Google reads each one twice and compares notes
 geminiProg	Scanned pages: {done} of {n}
-ocrDownload	First scan, so I’m fetching {mb} MB of eyeballs. One-time download, kept in your browser · {pct}%
+ocrDownload	First scan: downloading the scan reader ({mb} MB, one time only) · {pct}%
 ocrPage	Reading page {no} locally ({i} of {n})
 picPage	Page {no} has an image in it. Checking it for tables
 writing	Writing Excel…
