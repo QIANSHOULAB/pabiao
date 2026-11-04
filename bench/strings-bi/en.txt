@@ -1,0 +1,129 @@
+# 渡表僧 v0.2.6 英文界面文字（从 strings.js 导出）。一行一条：键<Tab>字。{x} 是填进去的数，{n|单数|复数} 按 n 挑一个。
+title	Dubiao · PDF to Excel
+desc	Drop in a PDF, get an Excel file back. Scans too. Runs in your browser, on phone or computer, and your file isn’t uploaded.
+name	Dubiao
+langAria	Language
+langEN	EN
+langZH	中文
+settings	Settings
+heroSub	Drop the PDF. Go play. Your tables find enlightenment.
+heroLead	PDF in, Excel out. Scans too.
+dropT	Drop a PDF here
+dropH	Hundreds of pages? Fine. Tables split across pages get stitched back together.
+dropBtn	Choose PDF
+privacy	Your file never leaves your browser. Scans go to Google only if you add a key.
+workSay	Go look busy somewhere. I’ve got this.
+opening	Opening PDF…
+metaPages	 · {n} {n|page|pages}
+pageOf	Page {p} of {n}
+geminiStart	{n} scanned {n|page|pages}. Google reads each one twice and compares notes
+geminiProg	Scanned pages: {done} of {n}
+ocrDownload	First scan, so I’m fetching {mb} MB of eyeballs. One-time download, kept in your browser · {pct}%
+ocrPage	Reading page {no} locally ({i} of {n})
+picPage	Page {no} has an image in it. Checking it for tables
+writing	Writing Excel…
+errTitle	Couldn’t convert this one
+doneTitle	Got {n} {n|table|tables}, {rows} {rows|row|rows}
+doneFlags	{n} {n|cell|cells} I’m not sure about, marked {colors}. Excel’s downloaded.
+doneClean	Excel’s downloaded. Nothing flagged.
+cY	yellow
+cO	orange
+cR	red
+noTableTitle	Looked everywhere. No tables.
+noTableText	The text went into Excel line by line. Better than nothing.
+noText	This PDF has no text in it at all.
+scanTitle	This one’s a scan
+noTableOnText	No tables on the text pages
+pageErr	Page {no}: {err}
+hint404	Google doesn’t know that model (details below), so {n|page|pages} {x} got read locally. Pick another model under ⚙ at top right and drop the file again for a sharper read.
+hintGErr	Google hit a snag (details below), so {n|page|pages} {x} got read locally.
+hintLocal	{n|Page|Pages} {x} {n|is a scan|are scans}, read right here in your browser. Nothing uploaded. Add a key for sharper eyes.
+hintLeft	Couldn’t read {n|page|pages} {x}. Reasons below.
+keyRetryH	Try another key
+keyRetryP	Paste a key that works. Google rereads the scans and a fresh Excel downloads.
+keyNewH	Want a sharper read?
+keyNewP	Paste a Gemini key. Google reads each page twice and compares, then a fresh Excel downloads.
+keyPh	Paste a key (AIza… or AQ.…)
+getKey	Get a key
+saveAgain	Download again
+another	Another PDF
+pvTitle	What came out
+pvNote	First few rows of each table. Yellow means not sure, orange means letters got turned back into digits, red means the reads disagreed. Excel has the same colors; hover a cell for the reason.
+pvMeta	{pn|Page|Pages} {x} · {r} {r|row|rows} × {c} {c|column|columns}
+pvFlags	{n} to check
+pvMoreRows	…{n} more {n|row|rows} in Excel
+pvMoreTables	{n} more {n|table|tables} in the Excel file only.
+key1	Key 1
+key1Ph	Only needed for scans
+key2	Key 2
+key2Ph	Spare, usually blank
+keyHint	When key 1 runs out for the day, key 2 takes over. Keys stay in this browser. 
+model	Model
+madeBy	Made by Shishou, the abbot
+labHome	More tools
+mailAbbot	Email the abbot
+setDone	Done
+footLab	QIANSHOU LAB
+footHome	More tools
+notPdf	“{name}” isn’t a PDF. I only do PDFs.
+pdfLocked	This PDF is password-protected, and I don’t pick locks. Remove the password in another app, then drop it in again.
+pdfOpen	Couldn’t open this PDF: {msg}
+libPdf	The PDF reader didn’t load from cdn.jsdelivr.net. Refresh once your connection is back.
+libXlsx	The Excel writer didn’t load from cdn.jsdelivr.net. Refresh once your connection is back.
+ocrStart	The local reader didn’t start: {msg}
+ocrStartWhy	probably a bad connection, the library didn’t download
+ocrDl	{file} didn’t download: HTTP {status}
+ocrDict	Dictionary doesn’t match the model: {c} classes vs {n} characters
+imgFail	Couldn’t render the page image
+pageName	Page {no}
+http	HTTP {status}: {msg}
+netErr	Network error: {msg}
+netTimeout	no reply after {s} s
+notJson	Response wasn’t JSON: 
+modelEmpty	Model returned nothing: {why}
+modelEmptyWhy	empty
+modelNotJson	Model’s reply wasn’t JSON: 
+modelNoTables	Model’s JSON has no tables: 
+allKeysOut	Every key is out of quota for today. Resets {when}
+minuteWait	Hit the per-minute limit. Waiting {s} s
+keyFatal	Key {i} · {raw}
+keyDayOut	Key {i} is out of quota for today · {raw}
+keyMinute	Key {i} hit the per-minute limit · {raw}
+noSchema	Model won’t do structured output, switching to plain JSON · {raw}
+retryIn	{name} · {raw} · retrying in {w} s
+wDate	Looks like a date, but that day doesn’t exist
+wWeird	Looks almost like a number. Kept as text
+spill	Text runs into the next column. The column split may be off
+crammed	{n} numbers crammed into one cell. The rows probably didn’t split
+readDiff	Read {n} times, got different answers: {vals}
+blankVal	(blank)
+shapeDiff	The reads disagree on the table’s shape, so the whole table is marked
+unreadable	Unreadable characters (□)
+fixedNum	Read as “{v}”, changed to the number “{fixed}”
+lowConf	Read locally, low confidence ({n}/100)
+missed	The rest of this column has numbers. This one’s blank, maybe missed
+decimals	The rest of this column has {m} decimal {m|place|places}. This one has {d}
+creator	Dubiao
+sheetT	Table {n}
+sheetFallback	Table
+logSheet	Log
+logSummary	{p} {p|page|pages}, {n} {n|table|tables} found. {date}
+logHead.0	Sheet
+logHead.1	Pages
+logHead.2	Rows (excl. header)
+logHead.3	Columns
+logHead.4	Line above the table
+logHead.5	Cells to check
+logFlagsH	Cells to check (colored in the tables too; hover for the reason)
+logFlagsHead.0	Sheet
+logFlagsHead.1	Cell
+logFlagsHead.2	What I read
+logFlagsHead.3	Why
+logScans	Scanned pages
+logNoTable	No tables found. Here’s the text, line by line
+isPic	Has an image; {n} {n|table|tables} in it read locally
+isFail	Scan, couldn’t read it: {err}
+isFailWhy	no idea why
+isGemini	Scan, read by Google (twice, compared)
+isGFail	Scan, Google failed ({g}), read locally instead
+isLocal	Scan, read locally (no key)

@@ -1,7 +1,9 @@
 """端到端测试：本机起服务（网页 + 假谷歌），用 Edge 跑每份样本，下载的 Excel 逐格对标准答案。
 
-用法：.venv/Scripts/python tests/run_e2e.py [样本名关键字…] [--no-shots]
-结果打印出来，同时写进 tests/out/report.json。截图写进 docs/。
+用法：.venv/Scripts/python tests/run_e2e.py [样本名关键字…] [--no-shots] [--lang en|zh]
+--lang 选界面语言（默认 zh；页面本身默认英文），Excel 的表名、日志页、报错跟着换，下面对的字也按语言换。
+结果打印出来，同时写进 tests/out/report.json（英文写 report-en.json）。截图写进 docs/。
+本机有 Edge 用 Edge，没有就用 Playwright 自带的 Chromium。
 要联网：页面从 cdn.jsdelivr.net 拉 pdf.js 和 ExcelJS（跟线上一样）。
 """
 import json
@@ -24,6 +26,18 @@ OUT = ROOT / "tests" / "out"
 ANSWERS = {a["file"]: a for f in ("answers.json", "scan_answers.json") if (SAMPLES / f).exists()
            for a in json.loads((SAMPLES / f).read_text(encoding="utf-8"))}
 FLAG_FILLS = {"FFFFF2CC": "黄", "FFF8CBAD": "橙", "FFFFC7CE": "红"}
+LOG_SHEETS = ("扒表记录", "Log")          # 最后那张日志页：中文叫扒表记录，英文叫 Log
+LANG = next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--lang=")), None) or \
+    (sys.argv[sys.argv.index("--lang") + 1] if "--lang" in sys.argv[:-1] else "zh")
+# 日志或报错里要有的字，按界面语言
+NEEDLES = {
+    "zh": {"minute": "每分钟次数到顶", "day": "今天的额度用完了", "bad": "HTTP 400：API key not valid. Please pass a valid API key.",
+           "404": "HTTP 404：models/gemini-nope is not found", "html": "返回的不是 JSON：<html>", "net": "网络错误：",
+           "alldays": "所有钥匙今天的额度都用完了"},
+    "en": {"minute": "per-minute limit", "day": "out of quota for today", "bad": "HTTP 400: API key not valid. Please pass a valid API key.",
+           "404": "HTTP 404: models/gemini-nope is not found", "html": "Response wasn\u2019t JSON: <html>", "net": "Network error: ",
+           "alldays": "Every key is out of quota for today"},
+}[LANG]
 
 
 def flag_of(cell):
@@ -151,7 +165,7 @@ def check_cell(exp, got):
 
 def score(xlsx, ans):
     wb = openpyxl.load_workbook(xlsx)
-    sheets = [ws for ws in wb.worksheets if ws.title != "扒表记录"]
+    sheets = [ws for ws in wb.worksheets if ws.title not in LOG_SHEETS]
     rep = {"tables_expected": len(ans["tables"]), "tables_got": len(sheets), "tables": []}
     tot = {"num": [0, 0], "date": [0, 0], "text": [0, 0], "empty": [0, 0], "header": [0, 0]}
     zeros = [0, 0]
@@ -288,7 +302,7 @@ def open_page(ctx, port, keys=None, model=None, extra=""):
             + f"localStorage.setItem('pabiao.model', {json.dumps(model or 'gemini-3.5-flash-lite')});")
     if "api=" not in extra:                  # 默认走假谷歌，别打到真谷歌去
         extra += f"&api=http://127.0.0.1:{port}/v1beta"
-    page.goto(f"http://127.0.0.1:{port}/index.html?fast=1{extra}")
+    page.goto(f"http://127.0.0.1:{port}/index.html?fast=1&lang={LANG}{extra}")
     page.wait_for_function("window.__pabiao && window.__pabiao.ready")
     # 量主线程卡不卡：每 50ms 记一次，看最长隔了多久
     page.evaluate("""() => { const T = window.__pabiao; T.maxGap = 0; let last = performance.now();
@@ -322,12 +336,15 @@ def run_file(page, pdf, expect_download=True, timeout=300_000):
 
 
 def main():
-    want = [a for a in sys.argv[1:] if not a.startswith("--")]
+    want = [a for a in sys.argv[1:] if not a.startswith("--") and a not in ("en", "zh")]
     shots = "--no-shots" not in sys.argv
     srv, port = serve()
     report = {}
     with sync_playwright() as p:
-        browser = p.chromium.launch(channel="msedge")
+        try:
+            browser = p.chromium.launch(channel="msedge")
+        except Exception:
+            browser = p.chromium.launch()
         ctx = browser.new_context(accept_downloads=True, viewport={"width": 1280, "height": 900})
 
         def todo(name):
@@ -374,7 +391,8 @@ def main():
             res, path = run_file(page, txt)
             wb = openpyxl.load_workbook(path)
             res["sheets"] = wb.sheetnames
-            res["fulltext_rows"] = sum(1 for r in wb["扒表记录"].iter_rows(values_only=True) if r[0] and "停电" in str(r[0]))
+            log = next(wb[n] for n in LOG_SHEETS if n in wb.sheetnames)
+            res["fulltext_rows"] = sum(1 for r in log.iter_rows(values_only=True) if r[0] and "停电" in str(r[0]))
             report["边角 · 没有表"] = res
             print("没有表", json.dumps(res, ensure_ascii=False))
             page.close()
@@ -410,14 +428,15 @@ def main():
             page.close()
 
             # (名字, 钥匙/模型, 期望走谁, 日志或报错里要有的字)
+            N = NEEDLES
             cases = [
-                ("额度到顶（每分钟）", dict(keys=["minute_" + "A" * 30]), "gemini", "每分钟次数到顶"),
-                ("额度到顶（当天，换 2 号钥匙）", dict(keys=["day_" + "A" * 30, "ok2_" + "A" * 30]), "gemini", "今天的额度用完了"),
-                ("钥匙无效 → 本地认", dict(keys=["bad_" + "A" * 30]), "local", "HTTP 400：API key not valid. Please pass a valid API key."),
-                ("模型不存在 → 本地认", dict(keys=["ok3_" + "A" * 30], model="gemini-nope"), "local", "HTTP 404：models/gemini-nope is not found"),
-                ("回来的不是 JSON → 本地认", dict(keys=["html_" + "A" * 30]), "local", "返回的不是 JSON：<html>"),
-                ("断网 → 本地认", dict(keys=["ok4_" + "A" * 30], extra="&api=http://127.0.0.1:9/v1beta"), "local", "网络错误："),
-                ("两把钥匙当天都用完 → 本地认", dict(keys=["day_" + "B" * 30, "day_" + "C" * 30]), "local", "所有钥匙今天的额度都用完了"),
+                ("额度到顶（每分钟）", dict(keys=["minute_" + "A" * 30]), "gemini", N["minute"]),
+                ("额度到顶（当天，换 2 号钥匙）", dict(keys=["day_" + "A" * 30, "ok2_" + "A" * 30]), "gemini", N["day"]),
+                ("钥匙无效 → 本地认", dict(keys=["bad_" + "A" * 30]), "local", N["bad"]),
+                ("模型不存在 → 本地认", dict(keys=["ok3_" + "A" * 30], model="gemini-nope"), "local", N["404"]),
+                ("回来的不是 JSON → 本地认", dict(keys=["html_" + "A" * 30]), "local", N["html"]),
+                ("断网 → 本地认", dict(keys=["ok4_" + "A" * 30], extra="&api=http://127.0.0.1:9/v1beta"), "local", N["net"]),
+                ("两把钥匙当天都用完 → 本地认", dict(keys=["day_" + "B" * 30, "day_" + "C" * 30]), "local", N["alldays"]),
                 ("第二遍认错一格（二比一）", dict(keys=["flaky_" + "A" * 30]), "gemini", ""),
                 ("三遍各不一样（标红）", dict(keys=["split_" + "A" * 30]), "gemini", ""),
             ]
@@ -492,7 +511,7 @@ def main():
         browser.close()
     srv.shutdown()
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+    (OUT / ("report.json" if LANG == "zh" else f"report-{LANG}.json")).write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

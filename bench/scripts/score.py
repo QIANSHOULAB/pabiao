@@ -48,7 +48,7 @@ def load(path):
     wb = openpyxl.load_workbook(path, data_only=True)
     out = []
     for ws in wb.worksheets:
-        if ws.title in ("扒表记录",):
+        if ws.title in ("扒表记录", "Log"):
             continue
         g, f = [], []
         for row in ws.iter_rows():

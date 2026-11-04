@@ -1,0 +1,129 @@
+# 渡表僧 v0.2.6 中文界面文字（从 strings.js 导出）。一行一条：键<Tab>字。{x} 是填进去的数，{n|单数|复数} 按 n 挑一个。
+title	渡表僧 · 表丢来，你去玩，贫僧超度
+desc	PDF 丢进来，Excel 自己下载，扫描件也认得。电脑、手机打开就用，文件不上传。
+name	渡表僧
+langAria	语言
+langEN	EN
+langZH	中文
+settings	设置
+heroSub	表丢来，你去玩，贫僧超度
+heroLead	PDF 丢进来，Excel 自己下载。扫描件也认得。
+dropT	把 PDF 丢这儿
+dropH	几十上百页也行，表跨页了贫僧给你接上
+dropBtn	选 PDF
+privacy	文件就在你浏览器里拆，不上传。贴了钥匙，扫描件才借谷歌的眼睛看。
+workSay	你可以去摸鱼了，剩下的交给老衲。
+opening	打开 PDF…
+metaPages	 · {n} 页
+pageOf	第 {p} / {n} 页
+geminiStart	扫描件 {n} 页，借谷歌的眼睛看，每页认两遍对答案
+geminiProg	扫描件 {done} / {n} 页
+ocrDownload	第一次认扫描件，先下 {mb} MB 的眼珠子，存进浏览器，下回不用再下 · {pct}%
+ocrPage	贫僧本地认字：第 {no} 页（{i} / {n}）
+picPage	第 {no} 页贴着张图，贫僧看看里面有没有表
+writing	写 Excel…
+errTitle	这份没扒成
+doneTitle	扒出 {n} 张表，{rows} 行
+doneFlags	{n} 格拿不准，表里标了{colors}。Excel 已经下载。干完你核对就好了。
+doneClean	Excel 已经下载。干完你核对就好了。
+cY	黄
+cO	橙
+cR	红
+noTableTitle	翻遍了，没找到表
+noTableText	正文按行放进 Excel 了，凑合看。
+noText	这份 PDF 里一个字都没有。
+scanTitle	这份是扫描件
+noTableOnText	有字的页里没找到表
+pageErr	第 {no} 页：{err}
+hint404	谷歌说模型名不对（原话在下面），第 {x} 页先本地认了。点右上角 ⚙ 换个模型，再丢一次更准。
+hintGErr	谷歌那边出了岔子（原话在下面），第 {x} 页先本地认了。
+hintLocal	第 {x} 页是扫描件，贫僧本地认的，没上传。眼神差点，贴把钥匙更准。
+hintLeft	第 {x} 页没认成，原因在下面。
+keyRetryH	换把钥匙，重认一遍
+keyRetryP	换一把能用的钥匙贴进来，贫僧借谷歌的眼睛重认，Excel 再下一次。
+keyNewH	贴把钥匙，重认一遍
+keyNewP	借谷歌的眼睛重认，每页认两遍对答案，Excel 再下一次。
+keyPh	粘贴钥匙（AIza… 或 AQ.…）
+getKey	免费领钥匙
+saveAgain	再下载
+another	换一份
+pvTitle	扒出来的样子
+pvNote	每张表只放前几行。黄格拿不准，橙格是字母改回了数字，红格几遍认得不一样。Excel 里同样标着，鼠标放上去看原因。
+pvMeta	第 {x} 页 · {r} 行 × {c} 列
+pvFlags	{n} 格要看
+pvMoreRows	…还有 {n} 行，在 Excel 里
+pvMoreTables	另外 {n} 张表只在 Excel 里。
+key1	钥匙 1
+key1Ph	只有扫描件才用得上
+key2	钥匙 2
+key2Ph	备胎，平时空着
+keyHint	1 号今天用完了自动换 2 号。钥匙只存在这个浏览器里。
+model	模型
+madeBy	制作人：千手院方丈释手
+labHome	千手院总舵
+mailAbbot	方丈邮箱
+setDone	完成
+footLab	千手院 · QIANSHOU LAB
+footHome	千手院总舵
+notPdf	「{name}」不是 PDF。贫僧只吃 PDF。
+pdfLocked	这份 PDF 上了密码锁，贫僧撬不开。先用别的软件去掉密码再丢进来。
+pdfOpen	这份 PDF 打不开：{msg}
+libPdf	读 PDF 的库没从网上下载下来（cdn.jsdelivr.net），网络好了刷新再试
+libXlsx	Excel 的库没从网上下载下来（cdn.jsdelivr.net），网络好了刷新再试
+ocrStart	本地认字的程序没跑起来：{msg}
+ocrStartWhy	多半是网不好，库没下载下来
+ocrDl	{file} 没下载下来：HTTP {status}
+ocrDict	字典对不上模型：模型 {c} 类，字典 {n} 个字
+imgFail	图片没生成出来
+pageName	第 {no} 页
+http	HTTP {status}：{msg}
+netErr	网络错误：{msg}
+netTimeout	等了 {s} 秒没回音
+notJson	返回的不是 JSON：
+modelEmpty	模型没回内容：{why}
+modelEmptyWhy	空的
+modelNotJson	模型回的不是 JSON：
+modelNoTables	模型回的 JSON 里没有 tables：
+allKeysOut	所有钥匙今天的额度都用完了，{when} 刷新
+minuteWait	每分钟次数到顶，等 {s} 秒
+keyFatal	钥匙{i} · {raw}
+keyDayOut	钥匙{i} 今天的额度用完了 · {raw}
+keyMinute	钥匙{i} 每分钟次数到顶 · {raw}
+noSchema	模型不认结构化输出，改用纯 JSON 提示 · {raw}
+retryIn	{name} · {raw} · {w} 秒后重试
+wDate	像日期，可没有这一天
+wWeird	像数字又不太像，照原样当文字放了
+spill	这格的字跨到了隔壁列，分列可能不对
+crammed	一格里挤着 {n} 个数，多半是行没切开
+readDiff	认了 {n} 遍不一样：{vals}
+blankVal	（空）
+shapeDiff	几遍认出来的表格形状对不上，整张标黄
+unreadable	有看不清的字（□）
+fixedNum	认出来是「{v}」，按数字改成了「{fixed}」
+lowConf	本地认的，这格没把握（{n} 分）
+missed	这列别的行都有数，这格空着，可能漏认了
+decimals	这列别的都是 {m} 位小数，这格是 {d} 位
+creator	渡表僧
+sheetT	表{n}
+sheetFallback	表
+logSheet	扒表记录
+logSummary	共 {p} 页，扒出 {n} 张表。{date}
+logHead.0	表
+logHead.1	在第几页
+logHead.2	行（不算表头）
+logHead.3	列
+logHead.4	表上方那行字
+logHead.5	要看一眼的格子
+logFlagsH	要看一眼的格子（表里同样标了颜色，鼠标放上去能看原因）
+logFlagsHead.0	表
+logFlagsHead.1	格子
+logFlagsHead.2	扒到的字
+logFlagsHead.3	为什么
+logScans	扫描页
+logNoTable	没找到表，正文按行放在下面
+isPic	这页贴着张图，图里的 {n} 张表是本地认字认的
+isFail	扫描件，没认成：{err}
+isFailWhy	不知道为啥
+isGemini	扫描件，谷歌认的（认两遍对答案）
+isGFail	扫描件，谷歌没认成（{g}），改成本地认的
+isLocal	扫描件，本地认的（没钥匙）

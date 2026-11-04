@@ -2,6 +2,8 @@
 
 原名扒表僧，2026-11-01 Song 改名渡表僧。网址、仓库名还是 pabiao。
 
+英文名 **Dubiao · PDF to Excel**（副标题 Drop the PDF. Go play. Your tables find enlightenment.）。中英两套，默认英文，右上角 EN / 中文 切换，选过就记住；Excel 里的表名、记录页、批注也跟着语言走（英文是 Table 1… / Log）。
+
 PDF 丢进来，Excel 自己下载。扫描件也认得。千手院（QIANSHOU LAB）罗汉一尊。
 
 **网址：https://qianshoulab.github.io/pabiao/**
@@ -18,7 +20,8 @@ PDF 丢进来，Excel 自己下载。扫描件也认得。千手院（QIANSHOU L
 
 | 位置 | 是什么 |
 |---|---|
-| `index.html` | 整个网页，单文件。pdf.js 6.4.299、ExcelJS 4.4.0、onnxruntime-web 1.31.1 从 cdn.jsdelivr.net 引，版本钉死。本地认字的代码在 `#ocr-src` 那段，跑在 Worker 里 |
+| `index.html` | 整个网页。pdf.js 6.4.299、ExcelJS 4.4.0、onnxruntime-web 1.31.1 从 cdn.jsdelivr.net 引，版本钉死。本地认字的代码在 `#ocr-src` 那段，跑在 Worker 里 |
+| `strings.js` | 页面上、Excel 里给人看的字，英文一套、中文一套，改字只改这里 |
 | `models/` | 本地认字的模型（PP-OCRv5 mobile，Apache-2.0），来源和校验值见 `models/README.md` |
 | `samples/` | 自造的样本 PDF 和标准答案（`answers.json` 有字的、`scan_answers.json` 扫描件），内容全是编的 |
 | `tests/make_samples.py` | 造有字的样本和 s6 |
@@ -26,6 +29,7 @@ PDF 丢进来，Excel 自己下载。扫描件也认得。千手院（QIANSHOU L
 | `tests/run_e2e.py` | 本机起服务（网页 + 假谷歌），用 Edge 跑全部样本，逐格对答案；扫描件另报「认错的数字里标了颜色的、没标的」、电脑宽和手机宽的用时、第一次下载量 |
 | `tests/dev_ocr.py` | 调本地认字用：只跑扫描件，打印每个错格；`--engine tess` 换成 Tesseract.js 对比，`--debug` 存下收拾过的图和框 |
 | `tests/check_live.py` | 上线后自检：打开线上网址，丢样本进去对答案（含一份扫描件） |
+| `tests/bi.js` | 中英两套自检（Node + Playwright）：导出两套字到 `bench/strings-bi/`，中英各跑一遍真流程（电脑 1280、手机 390），查按钮撑破、折行、截字、横向滚动、控制台报错，截图放 `bench/shots-bi/` |
 | `docs/设计记录.md` | 为什么这么做 |
 | `bench/比武报告.md` | 跟 Nanonets、iLovePDF、PDF24 拿 9 份公开真文件对打的结果（施工单 011） |
 
@@ -36,7 +40,8 @@ python -m venv .venv
 .venv\Scripts\pip install playwright openpyxl reportlab pypdfium2 Pillow
 .venv\Scripts\python tests\make_samples.py
 .venv\Scripts\python tests\make_scans.py
-.venv\Scripts\python tests\run_e2e.py
+.venv\Scripts\python tests\run_e2e.py            （默认中文界面；--lang en 跑英文界面）
+npm i playwright && node tests\bi.js               （中英两套）
 ```
 
 制作人：千手院方丈释手 · [千手院总舵](https://qianshoulab.github.io/) · oilsongchengmin@gmail.com

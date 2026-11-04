@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>渡表僧 · 表丢来，你去玩，贫僧超度</title>
-<meta name="description" content="PDF 丢进来，Excel 自己下载。扫描件也认得。网页版，电脑、手机都能用。">
+<title>Dubiao · PDF to Excel</title>
+<meta name="description" content="Drop in a PDF, get an Excel file back. Scans too. Runs in your browser, on phone or computer, and your file isn’t uploaded.">
+<script src="strings.js?v=0.2.6"></script>
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#F5F5F7">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2334C77B'/%3E%3Cstop offset='1' stop-color='%23189A55'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Crect x='14' y='16' width='36' height='32' rx='4' fill='%23fff'/%3E%3Cpath d='M14 27h36M14 37h36M26 16v32M38 16v32' stroke='%23189A55' stroke-width='2.4'/%3E%3C/svg%3E">
@@ -14,13 +15,18 @@
     --bg: #F5F5F7; --card: #FFFFFF; --text: #1D1D1F; --grey: #6E6E73; --grey2: #86868B; --line: #E5E5EA;
     --blue: #0071E3; --blue-hover: #0077ED; --link: #0066CC; --green: #1D9A55; --fill: #F5F5F7;
     --yellow: #FFF2CC; --orange: #F8CBAD; --red: #FFD9DD; --red-text: #B3261E;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro SC", "SF Pro Text", "PingFang SC", "Helvetica Neue",
+            "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  }
+  html[lang=en] {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui,
+            "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--text); font-size: 17px; line-height: 1.47; letter-spacing: -.01em;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro SC", "SF Pro Text", "PingFang SC", "Helvetica Neue",
-                 "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    font-family: var(--font);
     -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
   }
   button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
@@ -29,7 +35,7 @@
   [hidden] { display: none !important; }
 
   /* 顶栏：苹果那种半透明细条 */
-  .nav { position: sticky; top: 0; z-index: 5; height: 48px; background: rgba(245, 245, 247, .8);
+  .nav { position: sticky; top: 0; z-index: 5; height: 48px; background: rgba(245, 245, 247, .98);
          backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
   .nav .in { max-width: 980px; margin: 0 auto; height: 100%; padding: 0 22px; display: flex; align-items: center; gap: 10px; }
   .nav .brand { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
@@ -39,10 +45,18 @@
               display: grid; place-items: center; cursor: pointer; transition: background .15s, color .15s; }
   .icon-btn:hover { background: rgba(0, 0, 0, .06); color: var(--text); }
   .icon-btn svg { width: 20px; height: 20px; }
+  /* EN / 中文：分段控件。看着 28 高，点的范围上下各多 8 */
+  .lang { display: flex; padding: 2px; border-radius: 9px; background: rgba(120, 120, 128, .12); }
+  .lang button { position: relative; min-width: 44px; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent;
+                 color: var(--grey); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s; }
+  .lang button::after { content: ""; position: absolute; inset: -8px 0; }
+  .lang button[aria-pressed="true"] { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 1px 4px rgba(0, 0, 0, .06); }
+  .lang button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 
   main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 56px 22px 40px; }
   .hero { text-align: center; margin-bottom: 40px; }
   .hero h1 { margin: 0; font-size: 56px; line-height: 1.07; font-weight: 700; letter-spacing: -.015em; }
+  html[lang=en] .hero h1 { letter-spacing: -.02em; }
   .hero .sub { margin: 10px 0 0; font-size: 28px; line-height: 1.14; font-weight: 600; }
   .hero .lead { margin: 14px 0 0; font-size: 19px; color: var(--grey); }
 
@@ -90,6 +104,7 @@
   .keybox h3 { margin: 0; font-size: 19px; }
   .keybox p { margin: 6px 0 14px; color: var(--grey); font-size: 15px; }
   .keyrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .keyrow .field { flex: 1 1 240px; }      /* 手机上钥匙框占满一行，「领钥匙」换到下一行，提示字不被截 */
   .field { height: 44px; border: 1px solid #D2D2D7; background: #fff; border-radius: 12px; padding: 0 14px; min-width: 0;
            flex: 1; outline: none; transition: border-color .15s, box-shadow .15s; font-size: 16px; }
   .field:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0, 113, 227, .18); }
@@ -116,10 +131,14 @@
   table.pv td.y { background: var(--yellow); }
   table.pv td.o { background: var(--orange); }
   table.pv td.r { background: var(--red); }
+  .hl { font-style: normal; padding: 0 4px; border-radius: 4px; }
+  .hl.y { background: var(--yellow); } .hl.o { background: var(--orange); } .hl.r { background: var(--red); }
+  .num { font-variant-numeric: tabular-nums; }
   .more { color: var(--grey2); font-size: 13px; margin: 10px 4px 0; }
 
   footer { text-align: center; color: var(--grey2); font-size: 12px; padding: 24px 22px 32px; }
   footer a { color: var(--grey); }
+  footer .dot { margin: 0 10px; }
 
   /* ⚙ */
   dialog { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 28px); }
@@ -130,10 +149,19 @@
   .row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; align-items: center; margin-bottom: 12px; }
   .row label { color: var(--grey); font-size: 15px; }
   .row .hint { grid-column: 2; color: var(--grey2); font-size: 13px; margin-top: -6px; }
-  .by { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 16px; color: var(--grey); font-size: 14px; }
+  .by { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 16px; color: var(--grey); font-size: 14px;
+         display: flex; justify-content: space-between; gap: 12px; }
+  .by #ver { white-space: nowrap; color: var(--grey2); }
   .dacts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
   .dacts .sp { flex: 1; }
+  .dacts #set-ok { margin-left: auto; }      /* 手机上折到第二行时也靠右 */
   .dacts .btn { height: 38px; font-size: 15px; padding: 0 16px; }
+
+  /* 断行：居中的短句两行一样长，不留一个字孤零零一行；中文只在标点、空格处断，词不拆开 */
+  .hero .sub, .hero .lead, .drop .t, .drop .h, .note, .say, .done-head h2, .done-head p { text-wrap: balance; }
+  .keybox p, .preview > p, .row .hint { text-wrap: pretty; }
+  .hero .sub, .hero .lead, .drop .t, .drop .h, .note, .say, .done-head h2, .done-head p, .keybox h3, .keybox p, .preview > p, .row .hint {
+    word-break: keep-all; overflow-wrap: anywhere; }
 
   @media (max-width: 600px) {
     main { padding: 32px 16px 24px; }
@@ -147,6 +175,7 @@
     .nav .in { padding: 0 14px; }
     .row { grid-template-columns: 1fr; gap: 6px; }
     .row .hint { grid-column: 1; margin-top: 0; }
+    .dacts .btn { padding: 0 14px; }
   }
 </style>
 </head>
@@ -159,16 +188,17 @@
 </svg>
 
 <div class="nav"><div class="in">
-  <div class="brand"><svg style="color:var(--green)"><use href="#i-grid"/></svg>渡表僧</div>
+  <div class="brand"><svg style="color:var(--green)"><use href="#i-grid"/></svg><span data-t="name"></span></div>
   <div class="sp"></div>
-  <button type="button" class="icon-btn" id="gear" aria-label="设置"><svg><use href="#i-gear"/></svg></button>
+  <div class="lang" role="group" data-t-aria="langAria"><button type="button" data-lang="en" lang="en" data-t="langEN"></button><button type="button" data-lang="zh" lang="zh-CN" data-t="langZH"></button></div>
+  <button type="button" class="icon-btn" id="gear" data-t-aria="settings"><svg><use href="#i-gear"/></svg></button>
 </div></div>
 
 <main>
   <div class="hero">
-    <h1>渡表僧</h1>
-    <p class="sub">表丢来，你去玩，贫僧超度</p>
-    <p class="lead">PDF 丢进来，Excel 自己下载。扫描件也认得。</p>
+    <h1 data-t="name"></h1>
+    <p class="sub" data-t="heroSub"></p>
+    <p class="lead" data-t="heroLead"></p>
   </div>
 
   <section class="card" id="stage">
@@ -176,18 +206,18 @@
     <div id="s-idle">
       <div class="drop" id="drop" role="button" tabindex="0">
         <svg><use href="#i-doc"/></svg>
-        <div class="t">把 PDF 丢这儿</div>
-        <div class="h">几十上百页也行，表跨页了贫僧给你接上</div>
-        <span class="btn">选 PDF</span>
+        <div class="t" data-t="dropT"></div>
+        <div class="h" data-t="dropH"></div>
+        <span class="btn" data-t="dropBtn"></span>
       </div>
-      <p class="note">文件就在你浏览器里拆，不上传。贴了钥匙，扫描件才借谷歌的眼睛看。</p>
+      <p class="note" data-t="privacy"></p>
     </div>
 
     <!-- 干活中 -->
     <div id="s-work" hidden>
       <div class="file"><svg><use href="#i-doc"/></svg><div style="min-width:0"><div class="n" id="w-name"></div><div class="m" id="w-meta"></div></div></div>
       <div class="bar"><i id="w-bar"></i></div>
-      <p class="say">你可以去摸鱼了，剩下的交给老衲。</p>
+      <p class="say" data-t="workSay"></p>
       <p class="status" id="w-status"></p>
     </div>
 
@@ -203,47 +233,49 @@
         <h3 id="d-keyh"></h3>
         <p id="d-keywhy"></p>
         <div class="keyrow">
-          <input class="field" id="d-keyin" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴钥匙（AIza… 或 AQ.…）">
-          <a class="btn ghost" href="/luruseng/key.html" target="_blank" rel="noopener">免费领钥匙</a>
+          <input class="field" id="d-keyin" type="password" autocomplete="off" spellcheck="false" data-t-ph="keyPh">
+          <a class="btn ghost" href="/luruseng/key.html" target="_blank" rel="noopener" data-t="getKey"></a>
         </div>
       </div>
       <div class="err" id="d-err" hidden></div>
       <div class="acts">
-        <button type="button" class="btn" id="d-save">再下载一次</button>
-        <button type="button" class="btn grey" id="d-again">换一份</button>
+        <button type="button" class="btn" id="d-save" data-t="saveAgain"></button>
+        <button type="button" class="btn grey" id="d-again" data-t="another"></button>
       </div>
     </div>
   </section>
 
   <section class="preview" id="preview" hidden>
-    <h2>扒出来的样子</h2>
-    <p id="pv-note">每张表只放前几行。<span style="background:var(--yellow);padding:0 4px;border-radius:4px">黄格</span>拿不准，<span style="background:var(--orange);padding:0 4px;border-radius:4px">橙格</span>是字母改回了数字，<span style="background:var(--red);padding:0 4px;border-radius:4px">红格</span>几遍认得不一样。Excel 里同样标着，鼠标放上去看原因。</p>
+    <h2 data-t="pvTitle"></h2>
+    <p id="pv-note" data-t-html="pvNote"></p>
     <div id="pv"></div>
   </section>
 </main>
 
-<footer>千手院 · QIANSHOU LAB　·　<a href="/" target="_blank" rel="noopener">千手院总舵</a></footer>
+<footer><span data-t="footLab"></span><span class="dot">·</span><a href="/" target="_blank" rel="noopener" data-t="footHome"></a><span class="dot">·</span><span class="num" id="foot-ver"></span></footer>
 
 <input type="file" id="pick" accept="application/pdf,.pdf" hidden>
 
 <dialog id="dlg-set"><div class="dcard">
-  <h2>设置</h2>
-  <div class="row"><label for="k1">钥匙 1</label><input class="field" id="k1" type="password" autocomplete="off" spellcheck="false" placeholder="只有扫描件才用得上"></div>
-  <div class="row"><label for="k2">钥匙 2</label><input class="field" id="k2" type="password" autocomplete="off" spellcheck="false" placeholder="备胎，平时空着"><div class="hint">1 号今天用完了自动换 2 号。钥匙只存在这个浏览器里。<a href="/luruseng/key.html" target="_blank" rel="noopener">免费领钥匙</a></div></div>
-  <div class="row"><label for="model">模型</label><select class="field" id="model"></select></div>
-  <div class="by">制作人：千手院方丈释手<span id="ver" style="float:right;color:var(--grey2)"></span></div>
+  <h2 data-t="settings"></h2>
+  <div class="row"><label for="k1" data-t="key1"></label><input class="field" id="k1" type="password" autocomplete="off" spellcheck="false" data-t-ph="key1Ph"></div>
+  <div class="row"><label for="k2" data-t="key2"></label><input class="field" id="k2" type="password" autocomplete="off" spellcheck="false" data-t-ph="key2Ph"><div class="hint"><span data-t="keyHint"></span><a href="/luruseng/key.html" target="_blank" rel="noopener" data-t="getKey"></a></div></div>
+  <div class="row"><label for="model" data-t="model"></label><select class="field" id="model"></select></div>
+  <div class="by"><span data-t="madeBy"></span><span id="ver" class="num"></span></div>
   <div class="dacts">
-    <a class="btn grey" href="/" target="_blank" rel="noopener">千手院总舵</a>
-    <a class="btn grey" id="mail" href="mailto:oilsongchengmin@gmail.com">方丈邮箱</a>
+    <a class="btn grey" href="/" target="_blank" rel="noopener" data-t="labHome"></a>
+    <a class="btn grey" id="mail" href="mailto:oilsongchengmin@gmail.com" data-t="mailAbbot"></a>
     <span class="sp"></span>
-    <button type="button" class="btn" id="set-ok" autofocus>完成</button>
+    <button type="button" class="btn" id="set-ok" autofocus data-t="setDone"></button>
   </div>
 </div></dialog>
+<script>I18N.apply(document);</script>
 
 <script type="text/plain" id="ocr-src">
 // 渡表僧 · 本地认字。在 Worker 里跑，不卡页面。模型是 PP-OCRv5 mobile（Apache-2.0）：det 找字在哪，rec 一段段认。
 // 先把图收拾干净：压平阴影 → 扶正 → 找出表格线（交给拼表）并擦掉（免得被认成 1 或 |）。
 let ort = null, det = null, rec = null, dict = null;
+const kerr = (k, v) => Object.assign(new Error(k), { k, v });     // 报错只带键和参数，字在 strings.js，页面那边按当前语言出
 
 async function grab(url, cacheName) {      // 下载一次，存进浏览器的 Cache Storage，下回直接拿
   let cache = null;
@@ -253,7 +285,7 @@ async function grab(url, cacheName) {      // 下载一次，存进浏览器的 
     if (hit) { const b = await hit.arrayBuffer(); postMessage({ type: 'dl', url, got: b.byteLength, cached: true }); return b; }
   }
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url.split('/').pop()} 没下载下来：HTTP ${res.status}`);
+  if (!res.ok) throw kerr('ocrDl', { file: url.split('/').pop(), status: res.status });
   const reader = res.body.getReader(), parts = [];
   let got = 0, last = 0;
   for (;;) {
@@ -277,7 +309,7 @@ async function init(m) {
   ort.env.logLevel = 'error';
   ort.env.wasm.wasmPaths = m.ort;
   ort.env.wasm.wasmBinary = await grab(m.ort + 'ort-wasm-simd-threaded.wasm', m.cache);
-  const opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+  const opt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all', logSeverityLevel: 3 };   // 3 = 只报错：模型里没用上的常量那几十条警告别刷控制台
   dict = new TextDecoder().decode(await grab(m.dict, m.cache)).split(/\r?\n/);
   if (dict[dict.length - 1] === '') dict.pop();
   det = await ort.InferenceSession.create(new Uint8Array(await grab(m.det, m.cache)), opt);
@@ -640,7 +672,7 @@ async function recognize(g, W, H, boxes) {
     });
     const out = await rec.run({ [rec.inputNames[0]]: new ort.Tensor('float32', x, [batch.length, 3, RH, mw]) });
     const o = out[rec.outputNames[0]], [, T, C] = o.dims;
-    if (C !== dict.length + 2) throw new Error(`字典对不上模型：模型 ${C} 类，字典 ${dict.length} 个字`);
+    if (C !== dict.length + 2) throw kerr('ocrDict', { c: C, n: dict.length });
     batch.forEach((j, bi) => words.push(...decode(o.data, bi * T * C, T, C, j, mw, g, W, H)));
   }
   return words;
@@ -749,14 +781,19 @@ self.onmessage = async (e) => {
     if (m.debug) { out.gray = g.buffer; out.dbox = boxes; }
     postMessage(out, m.debug ? [g.buffer] : []);
   } catch (err) {
-    postMessage({ type: 'error', id: m.id, message: String((err && err.message) || err) });
+    postMessage({ type: 'error', id: m.id, message: String((err && err.message) || err), k: err && err.k, v: err && err.v });
   }
 };
 </script>
 
 <script type="module">
 // 渡表僧（原名扒表僧）：PDF → Excel。有字的页靠 pdf.js 读字和格线自己拼表（不靠 AI，数字原样搬）；扫描页借 Gemini，认两遍对答案。
-const VERSION = '0.2.5';
+const VERSION = '0.2.6';
+// 界面文字全在 strings.js（中英两套）。tx(键, 参数) 按当前语言出字；报错用 UErr 带着键走，换语言时能重出
+const tx = (k, v) => I18N.t(k, v);
+class UErr extends Error { constructor(k, v) { super(tx(k, v)); this.k = k; this.v = v; } }
+const errText = (e) => (!e ? '' : typeof e === 'string' ? e : e.k ? tx(e.k, e.v) : e.message || String(e));
+const whyOf = (f) => tx(f.k, f.v);         // 拿不准的格子：为什么
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/';
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const Q = new URLSearchParams(location.search);
@@ -805,7 +842,7 @@ function parseCell(raw) {
       const fmt = m[2] === '年' ? 'yyyy"年"m"月"d"日"' : `yyyy${m[2]}${pad ? 'mm' : 'm'}${m[2]}${pad ? 'dd' : 'd'}`;
       return { t: 'd', v: [y, mo, d], fmt };
     }
-    return { t: 's', v: shown, warn: '像日期，可日子不存在' };
+    return { t: 's', v: shown, warn: 'wDate' };
   }
   let neg = false, paren = false, pct = false, prefix = '';
   if (/^\(.*\)$/.test(s)) { paren = true; neg = true; s = s.slice(1, -1).trim(); }
@@ -825,7 +862,7 @@ function parseCell(raw) {
   if (/\d/.test(s) && /^[-+(]?[\d,.\s]+%?\)?$/.test(half(shown).trim())) return weird(shown);
   return { t: 's', v: shown };
 }
-function weird(shown) { return { t: 's', v: shown, warn: '像数字又不太像，照原样当文字放了' }; }
+function weird(shown) { return { t: 's', v: shown, warn: 'wWeird' }; }
 const isYear = (txt) => /^(19|20)\d\d$/.test(half(txt).trim());
 const numish = (txt) => { const c = parseCell(txt); return !!c && (c.t === 'n' || c.t === 'd' || !!c.code); };
 
@@ -1320,7 +1357,7 @@ function buildStream(lines) {
   const t = finishTable({ kind: 'stream', cells, merges: hmerges, top: lines[0].y + lines[0].fs, bottom: lines[lines.length - 1].y - 0.3 * lines[lines.length - 1].fs, ncols: nc, cols });
   t.headerRows = hcells.length;
   rows.forEach((r, i) => r.src.forEach((v, c) => { if (v) t.src.set(`${hcells.length + i},${c}`, v); }));
-  rows.forEach((r, i) => r.span.forEach((c) => t.flags.set(`${hcells.length + i},${c}`, { why: '这格的字跨到了隔壁列，分列可能不对', color: 'y' })));
+  rows.forEach((r, i) => r.span.forEach((c) => t.flags.set(`${hcells.length + i},${c}`, { k: 'spill', color: 'y' })));
   return t;
 }
 function streamHeader(band, cols) {
@@ -1455,11 +1492,11 @@ function typeTable(t) {
   }
   for (let r = H; r < t.cells.length; r++) for (let c = 0; c < t.ncols; c++) {
     const x = t.typed[r][c];
-    if (x && x.warn && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: x.warn, color: 'y' });
+    if (x && x.warn && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { k: x.warn, color: 'y' });
     // 一格里挤着三个以上的数：行没切开的样子（比武时 88 格全错还报「扒出 1 张表」，不能再这样）
     const toks = String(t.cells[r][c] ?? '').trim().split(/\s+/).filter((w) => numish(w));
     const spaced = /^\d{1,3}( \d{3})+(\.\d+)?$/.test(String(t.cells[r][c] ?? '').trim());
-    if (toks.length >= 3 && !spaced) t.flags.set(`${r},${c}`, { why: `一格里挤着 ${toks.length} 个数，多半是行没切开，对一下原件`, color: 'r' });
+    if (toks.length >= 3 && !spaced) t.flags.set(`${r},${c}`, { k: 'crammed', v: { n: toks.length }, color: 'r' });
   }
   t.bodyRows = t.cells.length - H;
 }
@@ -1467,7 +1504,7 @@ function typeTable(t) {
 // ================================================================ Gemini：只给扫描页用（钥匙、报错、额度的做法照录入僧）
 class ApiError extends Error {
   constructor(status, message, detail = '') { super(message); this.status = status; this.detail = detail; }
-  raw() { return this.status ? `HTTP ${this.status}：${this.message}` : this.message; }
+  raw() { return this.status ? tx('http', { status: this.status, msg: this.message }) : this.message; }
 }
 class Fatal extends Error {}
 class Stopped extends Error {}
@@ -1521,7 +1558,7 @@ async function callApi(model, key, body, signal) {
     raw = await res.text();
   } catch (e) {
     if (signal && signal.aborted) throw new Stopped('stopped');
-    throw new ApiError(0, `网络错误：${ctl.signal.aborted ? `等了 ${TIMEOUT} 秒没回音` : (e && e.message) || String(e)}`);
+    throw new ApiError(0, tx('netErr', { msg: ctl.signal.aborted ? tx('netTimeout', { s: TIMEOUT }) : (e && e.message) || String(e) }));
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', onAbort);
@@ -1531,19 +1568,19 @@ async function callApi(model, key, body, signal) {
     try { const err = JSON.parse(raw).error || {}; msg = err.message || msg; detail = JSON.stringify(err.details || ''); } catch (e) { /* 原样 */ }
     throw new ApiError(res.status, msg, detail);
   }
-  try { return JSON.parse(raw); } catch (e) { throw new ApiError(0, '返回的不是 JSON：' + raw.slice(0, 300)); }
+  try { return JSON.parse(raw); } catch (e) { throw new ApiError(0, tx('notJson') + raw.slice(0, 300)); }
 }
 function parseTables(data) {
   const parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
   const text = parts.map((p) => p.text || '').join('').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
   if (!text) {
-    const why = ((data.candidates || [])[0] || {}).finishReason || (data.promptFeedback || {}).blockReason || '空的';
-    throw new ApiError(0, `模型没回内容：${why}`);
+    const why = ((data.candidates || [])[0] || {}).finishReason || (data.promptFeedback || {}).blockReason || tx('modelEmptyWhy');
+    throw new ApiError(0, tx('modelEmpty', { why }));
   }
   let obj;
-  try { obj = JSON.parse(text); } catch (e) { throw new ApiError(0, '模型回的不是 JSON：' + text.slice(0, 300)); }
+  try { obj = JSON.parse(text); } catch (e) { throw new ApiError(0, tx('modelNotJson') + text.slice(0, 300)); }
   const tables = Array.isArray(obj) ? obj : obj.tables;
-  if (!Array.isArray(tables)) throw new ApiError(0, '模型回的 JSON 里没有 tables：' + text.slice(0, 300));
+  if (!Array.isArray(tables)) throw new ApiError(0, tx('modelNoTables') + text.slice(0, 300));
   const rowsOf = (x) => (Array.isArray(x) ? x : []).filter(Array.isArray).map((r) => r.map((v) => (v == null ? '' : String(v))));
   return tables.map((t) => ({ header: rowsOf(t && t.header), rows: rowsOf(t && t.rows) }));
 }
@@ -1575,8 +1612,8 @@ class Engine {
       const [i, key] = this.keys.pick();
       if (i === null) {
         const secs = Math.max(0, (key - Date.now()) / 1000);
-        if (secs > 120) throw new Fatal(`所有钥匙今天的额度都用完了，${when(key)} 刷新`);      // 不干等到半夜：剩下的页本地认
-        this.say(`每分钟次数到顶，等 ${Math.ceil(secs)} 秒`);
+        if (secs > 120) throw new Fatal(tx('allKeysOut', { when: when(key) }));      // 不干等到半夜：剩下的页本地认
+        this.say(tx('minuteWait', { s: Math.ceil(secs) }));
         await this.sleep(Math.max(0, key - Date.now()));
         continue;
       }
@@ -1589,24 +1626,24 @@ class Engine {
         if (!(e instanceof ApiError)) throw e;
         if (e.status === 429) {
           const kind = classify429(e);
-          if (kind === 'prepay') throw new Fatal(`钥匙${i + 1} · ${e.raw()}`);
-          if (kind === 'day') { const now = Date.now(); this.keys.park(i, now + (nextPacificMidnight(now) - now) * SPEED); this.say(`钥匙${i + 1} 今天的额度用完了 · ${e.raw()}`); }
+          if (kind === 'prepay') throw new Fatal(tx('keyFatal', { i: i + 1, raw: e.raw() }));
+          if (kind === 'day') { const now = Date.now(); this.keys.park(i, now + (nextPacificMidnight(now) - now) * SPEED); this.say(tx('keyDayOut', { i: i + 1, raw: e.raw() })); }
           else {
             if (++minuteHits > MAX_MINUTE_WAITS) throw e;
             const d = retryDelay(e.detail);
             const w = d === null ? MINUTE_WAIT : Math.min(MINUTE_WAIT, Math.max(3, d + 1));
             this.keys.park(i, Date.now() + w * 1000 * SPEED);
-            this.say(`钥匙${i + 1} 每分钟次数到顶 · ${e.raw()}`);
+            this.say(tx('keyMinute', { i: i + 1, raw: e.raw() }));
           }
           continue;
         }
-        if (e.status === 400 && /schema/i.test(e.message) && this.useSchema) { this.useSchema = false; this.say(`模型不认结构化输出，改用纯 JSON 提示 · ${e.raw()}`); continue; }
-        if ([400, 401, 403].includes(e.status) && /API key|API_KEY|permission|PERMISSION/.test(`${e.message} ${e.detail}`)) throw new Fatal(`钥匙${i + 1} · ${e.raw()}`);
+        if (e.status === 400 && /schema/i.test(e.message) && this.useSchema) { this.useSchema = false; this.say(tx('noSchema', { raw: e.raw() })); continue; }
+        if ([400, 401, 403].includes(e.status) && /API key|API_KEY|permission|PERMISSION/.test(`${e.message} ${e.detail}`)) throw new Fatal(tx('keyFatal', { i: i + 1, raw: e.raw() }));
         if (e.status === 404) throw new Fatal(`${this.model} · ${e.raw()}`);
         if (e.status === 0 || e.status >= 500) {
           if (netTries < RETRY_WAITS.length) {
             const w = RETRY_WAITS[netTries++];
-            this.say(`${name} · ${e.raw()} · ${w} 秒后重试`);
+            this.say(tx('retryIn', { name, raw: e.raw(), w }));
             await this.wait(w);
             continue;
           }
@@ -1646,9 +1683,9 @@ function vote(reads) {
       let top = normCell(vals[0]);
       for (const [k, n] of tally) if (n > tally.get(top)) top = k;
       const winner = vals.find((v) => normCell(v) === top);
-      if (same.length >= 2 && tally.get(top) * 2 <= vals.length) flags.set(`${r},${c}`, { why: `认了 ${vals.length} 遍不一样：${vals.map((v) => v || '（空）').join(' / ')}`, color: 'r' });
-      else if (same.length < 2 && reads.length > 1) flags.set(`${r},${c}`, { why: '几遍认出来的表格形状对不上，这张表整张都得看一眼', color: 'y' });
-      else if (/□/.test(winner)) flags.set(`${r},${c}`, { why: '有看不清的字（□）', color: 'r' });
+      if (same.length >= 2 && tally.get(top) * 2 <= vals.length) flags.set(`${r},${c}`, { k: 'readDiff', v: { n: vals.length, vals: vals.map((v) => v || tx('blankVal')).join(' / ') }, color: 'r' });
+      else if (same.length < 2 && reads.length > 1) flags.set(`${r},${c}`, { k: 'shapeDiff', color: 'y' });
+      else if (/□/.test(winner)) flags.set(`${r},${c}`, { k: 'unreadable', color: 'r' });
       return winner === '' ? null : winner;
     }));
     return { header: t.header.length, cells: out, flags, ncols: nc };
@@ -1657,7 +1694,7 @@ function vote(reads) {
 
 function canvasJpeg(canvas) {
   return new Promise((ok, bad) => canvas.toBlob((b) => {
-    if (!b) return bad(new Error('图片没生成出来'));
+    if (!b) return bad(new UErr('imgFail'));
     const fr = new FileReader();
     fr.onload = () => ok(String(fr.result).split(',')[1]);
     fr.onerror = () => bad(fr.error);
@@ -1691,7 +1728,7 @@ async function renderPage(page, enhance) {
 }
 async function readScan(doc, pg, eng) {
   const page = await doc.getPage(pg.no);
-  const name = `第 ${pg.no} 页`;
+  const name = tx('pageName', { no: pg.no });
   const plain = await renderPage(page, false);
   const reads = [await eng.read(plain, name), await eng.read(await renderPage(page, true), name)];
   if (!sameRead(reads[0], reads[1])) reads.push(await eng.read(plain, name));
@@ -1727,18 +1764,18 @@ function ocrWorker() {
       OCR.got[m.url] = m.got;
       if (!m.cached) {
         const pct = Math.min(99, Math.round(Object.values(OCR.got).reduce((p, q) => p + q, 0) / OCR_BYTES * 100));
-        say(`第一次认扫描件，先下 ${OCR_MB} MB 的眼珠子，存进浏览器，下回不用再下 · ${pct}%`);
+        say(tx('ocrDownload', { mb: OCR_MB, pct }));
       }
       return;
     }
     const p = OCR.wait.get(m.id);
     if (!p) return;
     OCR.wait.delete(m.id);
-    if (m.type === 'error') p.bad(new Error(m.message)); else p.ok(m);
+    if (m.type === 'error') p.bad(m.k ? new UErr(m.k, m.v) : new Error(m.message)); else p.ok(m);
   };
   w.onerror = (e) => {
     e.preventDefault();
-    for (const p of OCR.wait.values()) p.bad(new Error(`本地认字的程序没跑起来：${e.message || '多半是网不好，库没下载下来'}`));
+    for (const p of OCR.wait.values()) p.bad(new UErr('ocrStart', { msg: e.message || tx('ocrStartWhy') }));
     OCR.wait.clear(); OCR.w = null; OCR.ready = null;
   };
   return w;
@@ -1899,15 +1936,15 @@ function ocrFix(t) {
         let bare = w.replace(/^[!|'`‘’":;,.]+|[!|'`‘’":;]+$/g, '');
         if (/\)$/.test(bare) && !/^\(/.test(bare)) bare = bare.slice(0, -1);
         const fixed = (goodNum(bare) ? bare : w).replace(/[ODQIl|i!ZzSsBGbgqo]/g, (ch) => CONFUSE[ch]);
-        if (fixed !== w && goodNum(fixed)) { t.flags.set(key, { why: `认出来是「${v}」，按数字改成了「${fixed}」`, color: 'o' }); w = fixed; }
+        if (fixed !== w && goodNum(fixed)) { t.flags.set(key, { k: 'fixedNum', v: { v, fixed }, color: 'o' }); w = fixed; }
       }
       if (w !== v) t.cells[r][c] = w;
-      if (!t.flags.has(key) && sure < OCR_SURE_NUM) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
+      if (!t.flags.has(key) && sure < OCR_SURE_NUM) t.flags.set(key, { k: 'lowConf', v: { n: Math.round(sure * 100) }, color: 'y' });
     } else {
       // 老统计年鉴的行名后面跟一串引导点「Idaho.......」，认出来剩个「Idaho.」「Kansas-」：去掉
       const bare = v.replace(/[\s.\-_·…‥:：'`]+$/, '');
       if (!numCol[c] && bare !== v && bare.length >= 2 && /[A-Za-z一-鿿)）]$/.test(bare)) t.cells[r][c] = bare;
-      if (sure < OCR_SURE_TEXT) t.flags.set(key, { why: `本地认的，这格没把握（${Math.round(sure * 100)} 分）`, color: 'y' });
+      if (sure < OCR_SURE_TEXT) t.flags.set(key, { k: 'lowConf', v: { n: Math.round(sure * 100) }, color: 'y' });
     }
   }
   // 数字列里别的行都有数、这行别的格也都有字，偏偏这格空着：多半是漏认了
@@ -1919,7 +1956,7 @@ function ocrFix(t) {
     for (let r = H; r < R; r++) {
       if (t.cells[r][c] != null && t.cells[r][c] !== '') continue;
       const rowFilled = t.cells[r].filter((v) => v != null && v !== '').length;
-      if (rowFilled >= 0.6 * t.ncols && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: '这列别的行都有数，这格空着，可能漏认了', color: 'y' });
+      if (rowFilled >= 0.6 * t.ncols && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { k: 'missed', color: 'y' });
     }
   }
   // 同一列小数位数对不上的：多半是小数点没认出来，或者多认了一位
@@ -1935,7 +1972,7 @@ function ocrFix(t) {
     const [mode, n] = [...cnt].sort((p, q) => q[1] - p[1])[0] || [0, 0];
     if (decs.length < 4 || n < 0.75 * decs.length) continue;
     for (const [r, d] of decs) {
-      if (d !== mode && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { why: `这列别的都是 ${mode} 位小数，这格是 ${d} 位`, color: 'y' });
+      if (d !== mode && !t.flags.has(`${r},${c}`)) t.flags.set(`${r},${c}`, { k: 'decimals', v: { m: mode, d }, color: 'y' });
     }
   }
   delete t.src;
@@ -1947,7 +1984,7 @@ async function picScans() {
   if (!pages.length) return;
   try { await ocrReady(); } catch (e) { return; }
   for (const pg of pages) {
-    say(`第 ${pg.no} 页贴着张图，贫僧看看里面有没有表`);
+    say(tx('picPage', { no: pg.no }));
     const keep = { top: pg.top, bottom: pg.bottom, height: pg.height, free: pg.free };
     try {
       const got = [];
@@ -1960,12 +1997,12 @@ async function picScans() {
 }
 
 async function localScans(pages, lo) {
-  try { await ocrReady(); } catch (e) { for (const p of pages) p.localError = e.message; return; }
+  try { await ocrReady(); } catch (e) { for (const p of pages) p.localError = e; return; }
   let done = 0;
   for (const pg of pages) {
-    say(`贫僧本地认字：第 ${pg.no} 页（${done + 1} / ${pages.length}）`);
+    say(tx('ocrPage', { no: pg.no, i: done + 1, n: pages.length }));
     try { pg.tables = await readLocal(job.doc, pg); pg.via = 'local'; pg.localError = ''; }
-    catch (e) { pg.localError = e.message || String(e); }
+    catch (e) { pg.localError = e; }
     done++;
     bar(lo + (0.92 - lo) * done / pages.length);
   }
@@ -1977,7 +2014,7 @@ const thin = { style: 'thin', color: { argb: 'FFD1D1D6' } };
 const BORDER = { top: thin, left: thin, bottom: thin, right: thin };
 function colName(c) { let s = ''; c++; while (c) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = (c - m - 1) / 26; } return s; }
 function sheetName(s, used) {
-  let n = String(s).replace(/[\[\]:*?/\\]/g, ' ').slice(0, 31) || '表';
+  let n = String(s).replace(/[\[\]:*?/\\]/g, ' ').slice(0, 31) || tx('sheetFallback');
   let k = 2, base = n;
   while (used.has(n)) n = `${base.slice(0, 27)} (${k++})`;
   used.add(n);
@@ -1992,21 +2029,22 @@ function pagesText(ps) {
     out.push(a === b ? `${a}` : `${a}–${b}`);
     a = b = p;
   }
-  return out.join('、');
+  return out.join(tx('listSep'));
 }
 async function waitExcelJS() {
   for (let i = 0; i < 300 && !window.ExcelJS; i++) await new Promise((ok) => setTimeout(ok, 100));
-  if (!window.ExcelJS) throw new Error('Excel 的库没从网上下载下来（cdn.jsdelivr.net），网络好了刷新再试');
+  if (!window.ExcelJS) throw new UErr('libXlsx');
   return window.ExcelJS;
 }
+const issueText = (k, v) => (k === 'isFail' ? tx(k, { err: errText(v.e) || tx('isFailWhy') }) : tx(k, v));
 async function buildWorkbook(job) {
   const ExcelJS = await waitExcelJS();
   const wb = new ExcelJS.Workbook();
-  wb.creator = '渡表僧';
+  wb.creator = tx('creator');
   wb.created = new Date();
   const used = new Set();
   job.tables.forEach((t, ti) => {
-    t.sheet = sheetName(`表${ti + 1}`, used);
+    t.sheet = sheetName(tx('sheetT', { n: ti + 1 }), used);
     const ws = wb.addWorksheet(t.sheet, t.headerRows ? { views: [{ state: 'frozen', ySplit: t.headerRows, xSplit: 0 }] } : {});
     const widths = Array(t.ncols).fill(6);
     t.typed.forEach((row, r) => {
@@ -2027,35 +2065,35 @@ async function buildWorkbook(job) {
           cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         }
         const f = t.flags.get(`${r},${c}`);
-        if (f) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[f.color] } }; cell.note = f.why; }
+        if (f) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[f.color] } }; cell.note = whyOf(f); }
       }
     });
     for (const m of t.merges) { try { ws.mergeCells(m[0] + 1, m[1] + 1, m[2] + 1, m[3] + 1); } catch (e) { /* 重叠的合并跳过 */ } }
     widths.forEach((w, c) => { ws.getColumn(c + 1).width = w; });
   });
-  // 最后一张：扒表记录
-  const ws = wb.addWorksheet(sheetName('扒表记录', used));
+  // 最后一张：扒表记录（英文叫 Log）
+  const ws = wb.addWorksheet(sheetName(tx('logSheet'), used));
   const add = (vals, bold) => { const r = ws.addRow(vals); if (bold) r.font = { bold: true }; return r; };
   add([job.name], true);
-  add([`共 ${job.pages} 页，扒出 ${job.tables.length} 张表。${new Date().toLocaleString('zh-CN')}`]);
+  add([tx('logSummary', { p: job.pages, n: job.tables.length, date: new Date().toLocaleString(I18N.locale) })]);
   add([]);
-  add(['表', '在第几页', '行（不算表头）', '列', '表上方那行字', '要看一眼的格子'], true);
+  add(tx('logHead'), true);
   for (const t of job.tables) add([t.sheet, pagesText(t.pages), t.bodyRows, t.ncols, t.caption || '', t.flags.size || '']);
-  const flagged = job.tables.flatMap((t) => [...t.flags].map(([k, f]) => { const [r, c] = k.split(',').map(Number); return [t.sheet, `${colName(c)}${r + 1}`, t.cells[r][c] ?? '', f.why]; }));
+  const flagged = job.tables.flatMap((t) => [...t.flags].map(([k, f]) => { const [r, c] = k.split(',').map(Number); return [t.sheet, `${colName(c)}${r + 1}`, t.cells[r][c] ?? '', whyOf(f)]; }));
   if (flagged.length) {
     add([]);
-    add(['要看一眼的格子（表里同样标了颜色，鼠标放上去能看原因）'], true);
-    add(['表', '格子', '扒到的字', '为什么'], true);
+    add([tx('logFlagsH')], true);
+    add(tx('logFlagsHead'), true);
     flagged.slice(0, 5000).forEach((v) => add(v));
   }
   if (job.issues.length) {
     add([]);
-    add(['扫描页'], true);
-    job.issues.forEach(([p, why]) => add([`第 ${p} 页`, why]));
+    add([tx('logScans')], true);
+    job.issues.forEach(([p, k, v]) => add([tx('pageName', { no: p }), issueText(k, v)]));
   }
   if (job.fulltext) {
     add([]);
-    add(['没找到表，正文按行放在下面'], true);
+    add([tx('logNoTable')], true);
     job.fulltext.forEach((row) => add(row));
   }
   [12, 14, 16, 8, 40, 60].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
@@ -2068,16 +2106,16 @@ let pdfjs = null;
 async function lib() {
   if (!pdfjs) {
     try { pdfjs = await import(PDFJS + 'legacy/build/pdf.min.mjs'); }
-    catch (e) { throw new Error('读 PDF 的库没从网上下载下来（cdn.jsdelivr.net），网络好了刷新再试'); }
+    catch (e) { throw new UErr('libPdf'); }
     pdfjs.GlobalWorkerOptions.workerSrc = PDFJS + 'legacy/build/pdf.worker.min.mjs';
   }
   return pdfjs;
 }
-const store = {
+const store = {      // localStorage 读写都包 try/catch：隐私模式、禁了存储也照样能用，只是记不住
   get keys() { try { return JSON.parse(localStorage.getItem('pabiao.keys') || '[]'); } catch (e) { return []; } },
-  set keys(v) { localStorage.setItem('pabiao.keys', JSON.stringify(v)); },
-  get model() { return localStorage.getItem('pabiao.model') || DEFAULT_MODEL; },
-  set model(v) { localStorage.setItem('pabiao.model', v); },
+  set keys(v) { try { localStorage.setItem('pabiao.keys', JSON.stringify(v)); } catch (e) { /* 记不住 */ } },
+  get model() { try { return localStorage.getItem('pabiao.model') || DEFAULT_MODEL; } catch (e) { return DEFAULT_MODEL; } },
+  set model(v) { try { localStorage.setItem('pabiao.model', v); } catch (e) { /* 记不住 */ } },
 };
 function show(id) {
   for (const s of ['s-idle', 's-work', 's-done']) $('#' + s).hidden = s !== id;
@@ -2090,26 +2128,27 @@ let job = null;     // 当前这份：{file, name, doc, pages, tables, blob, ...
 
 async function start(file) {
   if (!file) return;
-  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { job = null; finish({ error: `「${file.name}」不是 PDF。贫僧只吃 PDF。` }); return; }
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { job = null; finish({ error: new UErr('notPdf', { name: file.name }) }); return; }
   job = { file, name: file.name.replace(/\.pdf$/i, ''), issues: [] };
   T.result = null;
   $('#w-name').textContent = file.name;
-  $('#w-meta').textContent = `${(file.size / 1048576).toFixed(file.size < 1048576 ? 2 : 1)} MB`;
+  workMeta();
   $('#preview').hidden = true;
   show('s-work'); bar(0); say('');
   try {
     const L = await lib();
-    say('打开 PDF…');
+    say(tx('opening'));
     const data = new Uint8Array(await file.arrayBuffer());
     try {
       job.doc = await L.getDocument({ data, cMapUrl: PDFJS + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS + 'standard_fonts/',
         wasmUrl: PDFJS + 'wasm/', iccUrl: PDFJS + 'iccs/', isEvalSupported: false }).promise;
     } catch (e) {
-      if (e && e.name === 'PasswordException') throw new Error('这份 PDF 上了密码锁，贫僧撬不开。先用别的软件去掉密码再丢进来。');
-      throw new Error(`这份 PDF 打不开：${e && e.message || e}`);
+      if (e && e.name === 'PasswordException') throw new UErr('pdfLocked');
+      throw new UErr('pdfOpen', { msg: e && e.message || e });
     }
     const N = job.doc.numPages;
-    $('#w-meta').textContent += ` · ${N} 页`;
+    job.N = N;
+    workMeta();
     job.pages = [];
     for (let p = 1; p <= N; p++) {
       const page = await job.doc.getPage(p);
@@ -2124,13 +2163,13 @@ async function start(file) {
       delete pg.items; delete pg.H; delete pg.V;
       job.pages.push(pg);
       page.cleanup();
-      say(`第 ${p} / ${N} 页`);
+      say(tx('pageOf', { p, n: N }));
       bar(p / N * (job.pages.some((x) => x.scan) ? 0.4 : 0.92));
       if (p % 2 === 0 || N < 20) await tick();
     }
     await scans();
   } catch (e) {
-    finish({ error: e.message || String(e) });
+    finish({ error: e });
   }
 }
 
@@ -2144,7 +2183,7 @@ async function scans() {
     const eng = new Engine(keys, store.model, say);
     job.engine = eng;
     let done = 0;
-    say(`扫描件 ${todo.length} 页，借谷歌的眼睛看，每页认两遍对答案`);
+    say(tx('geminiStart', { n: todo.length }));
     const queue = [...todo];
     const worker = async () => {
       while (queue.length && !eng.stopped) {
@@ -2156,10 +2195,10 @@ async function scans() {
         } catch (e) {
           if (e instanceof Fatal) { eng.fatal = eng.fatal || e.message; eng.stop(); }
           if (e instanceof Stopped || e instanceof Fatal) return;
-          pg.error = e instanceof ApiError ? e.raw() : `${e.name || 'Error'}：${e.message}`;
+          pg.error = e instanceof ApiError ? e.raw() : `${e.name || 'Error'}: ${errText(e)}`;
         }
         done++;
-        say(`扫描件 ${done} / ${todo.length} 页`);
+        say(tx('geminiProg', { done, n: todo.length }));
         bar(0.4 + 0.3 * done / todo.length);
       }
     };
@@ -2176,12 +2215,12 @@ async function wrapUp() {
   const pages = job.pages;
   job.issues = [];
   for (const p of pages) {      // 扫描页每页怎么认的，写进「扒表记录」
-    if (p.picOcr) job.issues.push([p.no, `这页贴着张图，图里的 ${p.picOcr} 张表是本地认字认的`]);
+    if (p.picOcr) job.issues.push([p.no, 'isPic', { n: p.picOcr }]);
     if (!p.scan) continue;
     const g = p.error || (p.via !== 'gemini' && job.fatal) || '';
-    if (!p.tables) job.issues.push([p.no, `扫描件，没认成：${p.localError || g || '不知道为啥'}`]);
-    else if (p.via === 'gemini') job.issues.push([p.no, '扫描件，谷歌认的（认两遍对答案）']);
-    else job.issues.push([p.no, g ? `扫描件，谷歌没认成（${g}），改成本地认的` : '扫描件，本地认的（没钥匙）']);
+    if (!p.tables) job.issues.push([p.no, 'isFail', { e: p.localError || g }]);
+    else if (p.via === 'gemini') job.issues.push([p.no, 'isGemini']);
+    else job.issues.push([p.no, g ? 'isGFail' : 'isLocal', { g }]);
   }
   // 每次重新接一遍（补认了扫描页以后要重排）
   const fresh = pages.map((p) => ({ ...p, tables: (p.tables || []).map((t) => ({ ...t, cells: t.cells.map((r) => [...r]), merges: t.merges.map((m) => [...m]), flags: new Map(t.flags) })) }));
@@ -2201,12 +2240,14 @@ async function wrapUp() {
       page.cleanup();
     }
   }
-  say('写 Excel…');
+  say(tx('writing'));
   bar(0.96);
   let blob = null;
   if (job.tables.length || job.fulltext) {
-    blob = await buildWorkbook({ name: job.file.name, pages: pages.length, tables: job.tables, issues: job.issues, fulltext: job.fulltext && job.fulltext.length ? job.fulltext : null });
+    job.book = { name: job.file.name, pages: pages.length, tables: job.tables, issues: job.issues, fulltext: job.fulltext && job.fulltext.length ? job.fulltext : null };
+    blob = await buildWorkbook(job.book);
     job.blob = blob;
+    job.blobLang = I18N.lang;
     download();
   }
   bar(1);
@@ -2224,7 +2265,16 @@ function download() {
   T.downloads = (T.downloads || 0) + 1;
 }
 
-function finish({ error = '', scanLeft = [] }) {
+function workMeta() {
+  if (!job || !job.file) return;
+  const f = job.file;
+  $('#w-meta').textContent = `${(f.size / 1048576).toFixed(f.size < 1048576 ? 2 : 1)} MB` + (job.N ? tx('metaPages', { n: job.N }) : '');
+}
+
+let lastFinish = null;      // 换语言时照原样重出一遍
+function finish(args) {
+  lastFinish = args;
+  const { error = '', scanLeft = [] } = args;
   show('s-done');
   const flags = job && job.tables ? job.tables.reduce((n, t) => n + t.flags.size, 0) : 0;
   const red = job && job.tables ? job.tables.reduce((n, t) => n + [...t.flags.values()].filter((f) => f.color === 'r').length, 0) : 0;
@@ -2238,50 +2288,48 @@ function finish({ error = '', scanLeft = [] }) {
   $('#d-line2').hidden = true;
   const l2 = (s) => { $('#d-line2').textContent = s; $('#d-line2').hidden = !s; };
   if (error) {
-    $('#d-title').textContent = '这份没扒成';
+    $('#d-title').textContent = tx('errTitle');
     $('#d-line').textContent = '';
-    $('#d-err').textContent = error;
+    $('#d-err').textContent = errText(error);
     $('#d-err').hidden = false;
   } else if (nt) {
-    $('#d-title').textContent = `扒出 ${nt} 张表，${rows.toLocaleString()} 行`;
+    $('#d-title').textContent = tx('doneTitle', { n: nt, rows: rows.toLocaleString(I18N.locale) });
     const used = new Set(job.tables.flatMap((t) => [...t.flags.values()].map((f) => f.color)));
-    const names = [['y', '黄'], ['o', '橙'], ['r', '红']].filter(([c]) => used.has(c)).map(([, n]) => n).join('、');
-    $('#d-line').textContent = flags ? `${flags} 格拿不准，表里标了${names}。Excel 已经下载。干完你核对就好了。` : 'Excel 已经下载。干完你核对就好了。';
+    const colors = I18N.list([['y', 'cY'], ['o', 'cO'], ['r', 'cR']].filter(([c]) => used.has(c)).map(([, k]) => tx(k)));
+    $('#d-line').textContent = flags ? tx('doneFlags', { n: flags, colors }) : tx('doneClean');
   } else if (job && job.fulltext) {
-    $('#d-title').textContent = '翻遍了，没找到表';
-    $('#d-line').textContent = job.fulltext.length ? '正文按行放进 Excel 了，凑合看。' : '这份 PDF 里一个字都没有。';
+    $('#d-title').textContent = tx('noTableTitle');
+    $('#d-line').textContent = job.fulltext.length ? tx('noTableText') : tx('noText');
     if (!job.fulltext.length) $('#d-save').hidden = true;
   } else {
-    $('#d-title').textContent = scanLeft.length === (job.pages || []).length ? '这份是扫描件' : '有字的页里没找到表';
+    $('#d-title').textContent = scanLeft.length === (job.pages || []).length ? tx('scanTitle') : tx('noTableOnText');
     $('#d-line').textContent = '';
   }
   const local = job && job.pages ? job.pages.filter((p) => p.scan && p.tables && p.via === 'local') : [];
   if (!error && (scanLeft.length || local.length)) {
-    const gErr = [job.fatal, ...job.pages.filter((p) => p.scan && p.via !== 'gemini' && p.error).map((p) => `第 ${p.no} 页：${p.error}`)].filter(Boolean);
-    const lErr = scanLeft.filter((p) => p.localError).map((p) => `第 ${p.no} 页：${p.localError}`);
+    const gErr = [job.fatal, ...job.pages.filter((p) => p.scan && p.via !== 'gemini' && p.error).map((p) => tx('pageErr', { no: p.no, err: p.error }))].filter(Boolean);
+    const lErr = scanLeft.filter((p) => p.localError).map((p) => tx('pageErr', { no: p.no, err: errText(p.localError) }));
     const errs = [...new Set(gErr.concat(lErr))];
     if (errs.length) { $('#d-err').textContent = errs.join('\n'); $('#d-err').hidden = false; }
     const say2 = [];
     if (local.length) {
-      const which = pagesText(local.map((p) => p.no));
-      if (/HTTP 404/.test(job.fatal)) say2.push(`谷歌说模型名不对（原话在下面），第 ${which} 页先本地认了。点右上角 ⚙ 换个模型，再丢一次更准。`);
-      else if (gErr.length) { say2.push(`谷歌那边出了岔子（原话在下面），第 ${which} 页先本地认了。`); showKey(true); }
-      else { say2.push(`第 ${which} 页是扫描件，贫僧本地认的，没上传。眼神差点，贴把钥匙更准。`); showKey(false); }
+      const pv = { x: pagesText(local.map((p) => p.no)), n: local.length };
+      if (/HTTP 404/.test(job.fatal)) say2.push(tx('hint404', pv));
+      else if (gErr.length) { say2.push(tx('hintGErr', pv)); showKey(true); }
+      else { say2.push(tx('hintLocal', pv)); showKey(false); }
     }
-    if (scanLeft.length) say2.push(`第 ${pagesText(scanLeft.map((p) => p.no))} 页没认成，原因在下面。`);
-    l2(say2.join(''));
+    if (scanLeft.length) say2.push(tx('hintLeft', { x: pagesText(scanLeft.map((p) => p.no)), n: scanLeft.length }));
+    l2(say2.join(I18N.lang === 'en' ? ' ' : ''));
   }
   renderPreview();
   T.phase = 'done';
-  T.result = { error, tables: nt, rows, flags, red, scanLeft: scanLeft.map((p) => p.no), fatal: job && job.fatal || '', title: $('#d-title').textContent,
-    via: job && job.pages ? job.pages.filter((p) => p.scan).map((p) => [p.no, p.via || '']) : [], line2: $('#d-line2').hidden ? '' : $('#d-line2').textContent };
+  T.result = { error: errText(error), tables: nt, rows, flags, red, scanLeft: scanLeft.map((p) => p.no), fatal: job && job.fatal || '', title: $('#d-title').textContent,
+    via: job && job.pages ? job.pages.filter((p) => p.scan).map((p) => [p.no, p.via || '']) : [], line2: $('#d-line2').hidden ? '' : $('#d-line2').textContent, lang: I18N.lang };
 }
 function showKey(retry) {
   $('#d-key').hidden = false;
-  $('#d-keyh').textContent = retry ? '换把钥匙，重认一遍' : '贴把钥匙，重认一遍';
-  $('#d-keywhy').textContent = retry
-    ? '换一把能用的钥匙贴进来，贫僧借谷歌的眼睛重认，Excel 再下一次。'
-    : '借谷歌的眼睛重认，每页认两遍对答案，Excel 再下一次。';
+  $('#d-keyh').textContent = tx(retry ? 'keyRetryH' : 'keyNewH');
+  $('#d-keywhy').textContent = tx(retry ? 'keyRetryP' : 'keyNewP');
   $('#d-keyin').value = '';
 }
 
@@ -2299,9 +2347,9 @@ function renderPreview() {
     const tt = document.createElement('div');
     tt.className = 'tt';
     const b = document.createElement('b'); b.textContent = t.sheet;
-    const s = document.createElement('span'); s.textContent = `第 ${pagesText(t.pages)} 页 · ${t.bodyRows} 行 × ${t.ncols} 列${t.caption ? ' · ' + t.caption : ''}`;
+    const s = document.createElement('span'); s.textContent = tx('pvMeta', { x: pagesText(t.pages), pn: t.pages.length, r: t.bodyRows, c: t.ncols }) + (t.caption ? ' · ' + t.caption : '');
     tt.append(b, s);
-    if (t.flags.size) { const f = document.createElement('span'); f.className = 'flag'; f.textContent = `${t.flags.size} 格要看`; tt.append(f); }
+    if (t.flags.size) { const f = document.createElement('span'); f.className = 'flag'; f.textContent = tx('pvFlags', { n: t.flags.size }); tt.append(f); }
     const sc = document.createElement('div'); sc.className = 'scroll';
     const tb = document.createElement('table'); tb.className = 'pv';
     const covered = new Set();
@@ -2318,17 +2366,17 @@ function renderPreview() {
         td.textContent = t.cells[r][c] ?? '';
         if (x && (x.t === 'n' || x.t === 'd')) td.classList.add('n');
         const f = t.flags.get(`${r},${c}`);
-        if (f) { td.classList.add(f.color); td.title = f.why; }
+        if (f) { td.classList.add(f.color); td.title = whyOf(f); }
         tr.append(td);
       }
       tb.append(tr);
     }
     sc.append(tb);
     card.append(tt, sc);
-    if (t.bodyRows > MAXR) { const mo = document.createElement('div'); mo.className = 'more'; mo.textContent = `…还有 ${(t.bodyRows - MAXR).toLocaleString()} 行，在 Excel 里`; card.append(mo); }
+    if (t.bodyRows > MAXR) { const mo = document.createElement('div'); mo.className = 'more'; mo.textContent = tx('pvMoreRows', { n: (t.bodyRows - MAXR).toLocaleString(I18N.locale) }); card.append(mo); }
     box.append(card);
   });
-  if (job.tables.length > MAXT) { const mo = document.createElement('p'); mo.className = 'more'; mo.textContent = `另外 ${job.tables.length - MAXT} 张表只在 Excel 里。`; box.append(mo); }
+  if (job.tables.length > MAXT) { const mo = document.createElement('p'); mo.className = 'more'; mo.textContent = tx('pvMoreTables', { n: job.tables.length - MAXT }); box.append(mo); }
 }
 
 // ---------------------------------------------------------------- 按钮、拖放、钥匙
@@ -2356,14 +2404,14 @@ async function resumeWithKey(v) {
   job.fatal = '';
   for (const p of job.pages) if (p.scan && p.via !== 'gemini') p.error = '';
   show('s-work'); bar(0.4);
-  try { await scans(); } catch (e) { finish({ error: e.message || String(e) }); }
+  try { await scans(); } catch (e) { finish({ error: e }); }
 }
 $('#d-keyin').addEventListener('input', (e) => { if (looksKey(e.target.value)) resumeWithKey(e.target.value); });
 $('#d-keyin').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) resumeWithKey(e.target.value); });
 
 const dlg = $('#dlg-set');
 $('#model').append(...MODELS.map((m) => new Option(m, m)));
-$('#ver').textContent = `v${VERSION}`;
+$('#ver').textContent = $('#foot-ver').textContent = `v${VERSION}`;
 $('#gear').onclick = () => {
   const k = store.keys;
   $('#k1').value = k[0] || ''; $('#k2').value = k[1] || '';
@@ -2377,6 +2425,20 @@ $('#set-ok').onclick = () => { saveSettings(); dlg.close(); };
 dlg.addEventListener('close', saveSettings);
 dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
 $('#mail').addEventListener('click', () => { try { navigator.clipboard.writeText('oilsongchengmin@gmail.com'); } catch (e) { /* 复制不了就算了 */ } });
+
+// EN / 中文：默认英文，选过就记住（strings.js 存进 localStorage）。换完把页面上照状态出的字重出一遍，Excel 也换成这门语言
+async function setLang(l) {
+  if (l === I18N.lang || !I18N.set(l)) return;
+  workMeta();
+  if (T.phase !== 'done' || !lastFinish) return;
+  const typed = $('#d-key').hidden ? '' : $('#d-keyin').value;
+  if (job && job.book && job.blob && job.blobLang !== l) {
+    try { const blob = await buildWorkbook(job.book); if (I18N.lang !== l) return; job.blob = blob; job.blobLang = l; } catch (e) { /* 换不成就还是原来那份 */ }
+  }
+  finish(lastFinish);
+  if (typed && !$('#d-key').hidden) $('#d-keyin').value = typed;
+}
+document.querySelectorAll('.lang [data-lang]').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.lang)));
 
 T.ready = true;
 </script>

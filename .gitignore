@@ -5,3 +5,4 @@ __pycache__/
 bench/files/
 bench/raw/
 bench/out/
+node_modules/
